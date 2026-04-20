@@ -1,0 +1,681 @@
+# Notebook Todo Memory MVP
+
+## Overview
+
+This project is a fast MVP for persistent task capture and retrieval using a **Custom GPT** as the user interface, a **Linux-hosted backend API** for processing and business logic, **Google Sheets** as the canonical task database, and **Notion** as an optional mirrored dashboard.
+
+The goal is to let a solo founder or operator capture handwritten notebook tasks through a photo, store them outside chat history, and retrieve or update them later even if the original chat is deleted.
+
+## MVP Stack
+
+The architecture for the MVP is:
+
+- **Custom GPT** as the user interface
+- **Linux server** as the backend host
+- **VS Code Remote** for server-side development
+- **ngrok** to expose the backend API to Custom GPT
+- **Google Sheets API** as the primary persistent task database
+- **Notion API** as the optional dashboard and readable view layer
+
+## System Model
+
+The correct system model is:
+
+- **Custom GPT** = smart front-end
+- **Backend API** = task processing and business logic
+- **Google Sheets** = source of truth
+- **Notion** = optional synced dashboard
+
+This keeps the project on the fastest realistic MVP path while preserving memory outside chat history.
+
+---
+
+## Target User
+
+A solo founder or operator managing a mix of:
+
+- personal tasks
+- business / Kouch tasks
+
+## Main Use Case
+
+The primary workflow is:
+
+1. The user writes tasks in a physical notebook.
+2. The user sends a notebook photo to the Custom GPT.
+3. The system extracts tasks from the image.
+4. The system detects the page date if present.
+5. The system classifies tasks.
+6. The system saves tasks into Google Sheets.
+7. The system optionally syncs them into Notion.
+8. The user later asks questions or sends update commands.
+
+Example follow-up questions:
+
+- What is still pending?
+- What did I complete today?
+- Show me Kouch tasks.
+- Show me personal tasks.
+- What was not done after chat reset?
+
+## Practical MVP Flow
+
+The working MVP flow should be:
+
+- User sends notebook page
+- Custom GPT calls backend through ngrok
+- Backend extracts and structures tasks
+- Backend writes records to Google Sheets
+- Backend optionally mirrors tasks to Notion
+- Custom GPT returns clean results and accepts later updates or queries
+
+Because data lives in Google Sheets, task memory survives chat deletion.
+
+---
+
+## End-to-End System Design
+
+### End-to-End Flow
+
+**Input -> Custom GPT -> Backend API -> Processing -> Google Sheets -> Optional Notion Sync -> Response**
+
+### 1) Input Layer
+
+Supported MVP inputs:
+
+- handwritten notebook photo
+- typed text task list
+- natural-language update commands
+- natural-language query commands
+
+### 2) Custom GPT Layer
+
+The Custom GPT should only handle interface responsibilities:
+
+- receive user input
+- call backend actions
+- present responses clearly
+
+It should **not** own core logic such as storage rules, duplicate handling, or status management.
+
+### 3) Backend API Layer
+
+The Linux-hosted backend should handle:
+
+- image and text intake
+- extraction workflow
+- task normalization
+- category classification
+- date parsing
+- duplicate detection
+- Google Sheets reads, writes, and updates
+- optional Notion sync
+- query handling
+- status update handling
+
+### 4) Processing Layer
+
+This layer converts raw notebook content into structured task records.
+
+Responsibilities:
+
+- identify likely task lines
+- ignore headings and non-task notes
+- normalize titles
+- detect category
+- detect page date
+- assign default status
+- flag unclear items for review
+
+### 5) Persistence Layer
+
+Google Sheets is the canonical storage layer.
+
+Responsibilities:
+
+- save all tasks
+- keep task state
+- support filtering and querying
+- support updates after chat reset
+- maintain lightweight history
+
+### 6) Dashboard Layer
+
+Notion is optional and secondary.
+
+Responsibilities:
+
+- mirror tasks for easier browsing
+- provide filtered views
+- make daily review easier
+
+It should **not** be treated as the source of truth during MVP.
+
+### 7) Response Layer
+
+The backend should return structured outputs to Custom GPT such as:
+
+- extracted tasks by category
+- pending / done / in-progress lists
+- duplicate warnings
+- unclear items requiring review
+- update confirmations
+
+---
+
+## Core Rules
+
+1. **Google Sheets is the source of truth**
+   - Notion is a mirror and dashboard layer only.
+
+2. **Every task must have a unique ID**
+   - Task title alone is never enough.
+
+3. **Low-confidence extraction must be reviewable**
+   - Unreadable or uncertain lines should be flagged, not silently saved.
+
+4. **Keep statuses simple**
+   - Pending
+   - In Progress
+   - Done
+   - Archived
+
+5. **Keep categories simple**
+   - Personal
+   - Business / Kouch
+   - Unclear
+
+6. **Duplicate detection should stay basic**
+   - Use simple logic rather than advanced semantic matching.
+
+Recommended duplicate signals:
+
+- normalized title similarity
+- same category
+- similar date window
+
+---
+
+## Edge Cases
+
+### Messy Handwriting
+
+Handling:
+
+- flag for review
+- avoid confident auto-save when uncertain
+
+### Blurry Photo
+
+Handling:
+
+- return image-quality warning
+- do not create bad task records
+
+### No Page Date Written
+
+Handling:
+
+- save upload date as capture date
+- keep page date separate if identified later
+
+### Mixed Notes and Tasks
+
+Handling:
+
+- distinguish likely tasks from non-task lines
+- keep raw source text when needed
+
+### Repeated Recurring Tasks
+
+Example:
+
+- gym every day
+
+Handling:
+
+- do not auto-merge recurring daily tasks globally
+- use date context before treating something as a duplicate
+
+### Ambiguous Update Commands
+
+Example:
+
+- “mark it done”
+
+Handling:
+
+- only update when a clear target exists
+- otherwise return likely matches
+
+### Bulk Updates
+
+Example:
+
+- “complete all personal tasks from today”
+
+Handling:
+
+- allow only clearly filtered batch updates
+
+### Chat Deletion
+
+Handling:
+
+- no problem, because Google Sheets stores the real state
+
+---
+
+## High-Level Architecture
+
+```text
+User
+  ->
+Custom GPT
+  ->
+Action API Call
+  ->
+ngrok URL
+  ->
+Linux Server Backend
+  ->
+Task Processing + Rules
+  ->
+Google Sheets API
+  ->
+Optional Notion API Sync
+  ->
+Structured Response
+  ->
+Custom GPT
+```
+
+## Suggested Project Structure
+
+```text
+notebook-todo-memory/
+├── app/
+│   ├── api/
+│   │   ├── routes/
+│   │   │   ├── ingest
+│   │   │   ├── tasks_query
+│   │   │   ├── tasks_update
+│   │   │   └── health
+│   │   ├── schemas/
+│   │   │   ├── ingest_schema
+│   │   │   ├── query_schema
+│   │   │   └── update_schema
+│   │   └── middleware/
+│   │       ├── auth
+│   │       ├── request_logging
+│   │       └── error_handler
+│   ├── services/
+│   │   ├── image_intake_service
+│   │   ├── task_extraction_service
+│   │   ├── task_normalization_service
+│   │   ├── category_service
+│   │   ├── date_parser_service
+│   │   ├── duplicate_detection_service
+│   │   ├── task_save_service
+│   │   ├── task_query_service
+│   │   ├── task_update_service
+│   │   └── notion_sync_service
+│   ├── repositories/
+│   │   ├── sheets_task_repository
+│   │   ├── sheets_status_log_repository
+│   │   ├── sheets_config_repository
+│   │   └── notion_repository
+│   ├── integrations/
+│   │   ├── openai_client
+│   │   ├── google_sheets_client
+│   │   ├── notion_client
+│   │   └── ngrok_notes
+│   ├── domain/
+│   │   ├── task_model
+│   │   ├── status_rules
+│   │   ├── category_rules
+│   │   ├── duplicate_rules
+│   │   └── validation_rules
+│   ├── config/
+│   │   ├── env
+│   │   ├── prompts
+│   │   ├── sheet_columns
+│   │   └── constants
+│   └── utils/
+│       ├── date_utils
+│       ├── text_utils
+│       └── confidence_utils
+├── docs/
+│   ├── api_contract
+│   ├── prompt_contract
+│   ├── task_rules
+│   ├── google_sheets_layout
+│   └── deployment_notes
+├── data/
+│   ├── sample_pages/
+│   └── test_cases/
+└── README.md
+```
+
+## Component Responsibilities
+
+### Custom GPT
+
+- receives user input
+- calls backend endpoints
+- displays structured output
+
+### Backend API
+
+- accepts requests from Custom GPT
+- validates payloads
+- routes requests to services
+
+### Processing Services
+
+- extract tasks
+- clean titles
+- detect categories
+- parse dates
+- score uncertainty
+- check duplicates
+
+### Google Sheets Repositories
+
+- create, read, and update task rows
+- track task history
+- support filtering and querying
+
+### Notion Sync Service
+
+- mirror task records into Notion
+- update statuses in Notion
+- remain non-blocking for MVP
+
+---
+
+## Google Sheets Design
+
+Use Google Sheets as the primary task database.
+
+### Sheet 1: Tasks
+
+Columns:
+
+- Task ID
+- Raw Text
+- Normalized Title
+- Category
+- Status
+- Page Date
+- Capture Date
+- Source Type
+- Source Reference
+- Duplicate Flag
+- Review Required
+- Created At
+- Updated At
+- Completion Date
+
+### Sheet 2: Status Log
+
+Columns:
+
+- Log ID
+- Task ID
+- Old Status
+- New Status
+- Changed At
+- Change Source
+
+### Sheet 3: Config
+
+Suggested columns or keys:
+
+- Allowed Statuses
+- Allowed Categories
+- Duplicate Time Window
+- Notion Sync Enabled
+
+This structure is intentionally simple, readable, and easy to inspect manually.
+
+---
+
+## Notion Design
+
+Use a single Notion database as a mirrored viewing layer.
+
+Suggested views:
+
+- Pending
+- Done Today
+- In Progress
+- Personal
+- Kouch
+- Needs Review
+
+Notion should remain a convenience layer, not the canonical system.
+
+---
+
+## ngrok Role
+
+ngrok is appropriate for the MVP because it exposes the backend quickly for Custom GPT actions.
+
+For the 30-day MVP it is:
+
+- good enough for development and early testing
+- simple to wire into the Custom GPT action
+
+Later it can be replaced with a stable domain or reverse proxy.
+
+---
+
+## MVP Scope
+
+### MVP Must Include
+
+1. Custom GPT accepts image or text input.
+2. Backend processes notebook task content.
+3. Task extraction works on clear notebook pages.
+4. Date is detected if present.
+5. Tasks are categorized into Personal / Business-Kouch / Unclear.
+6. Tasks are saved into Google Sheets.
+7. User can query old tasks.
+8. User can update statuses.
+9. Data remains available after chat deletion.
+10. Optional Notion sync works as a readable dashboard.
+
+### MVP Must Not Include
+
+- advanced OCR optimization
+- mobile app
+- multi-user permissions
+- advanced analytics
+- reminder engine
+- complex deduplication
+- too many categories
+- full project management features
+
+### Best MVP Interaction Pattern
+
+1. User uploads notebook page.
+2. System extracts proposed tasks.
+3. System shows them for confirmation.
+4. Approved tasks are saved to Google Sheets.
+5. Optional mirror is sent to Notion.
+6. Later updates and queries use stored task records.
+
+That confirmation step is important because it prevents bad records from entering the database.
+
+---
+
+## 30-Day Build Plan
+
+### Week 1 — Finalize Data Contract and System Boundaries
+
+Tasks:
+
+- define task schema
+- define status values
+- define category rules
+- design Google Sheets structure
+- design Notion database fields
+- define Custom GPT action contracts
+- define request and response shapes
+- prepare sample notebook pages
+
+Exit criteria:
+
+- storage schema is stable
+- action contracts are clear
+- sample inputs and expected outputs exist
+
+### Week 2 — Build Persistent Storage and Task Workflows
+
+Tasks:
+
+- connect backend to Google Sheets API
+- implement task create flow
+- implement query flow
+- implement update flow
+- add task ID generation
+- add validation rules
+- add status change logging
+- add basic duplicate checks
+
+Exit criteria:
+
+- tasks can be saved, updated, and queried reliably
+- status history works
+- duplicate checks work on simple examples
+
+### Week 3 — Connect Custom GPT and Enable Image Extraction Workflow
+
+Tasks:
+
+- expose backend via ngrok
+- connect Custom GPT action to API
+- build image and text ingestion path
+- refine extraction output format
+- add review flag behavior
+- test with real notebook pages
+- improve handling of unreadable or mixed lines
+
+Exit criteria:
+
+- Custom GPT can process notebook pages end-to-end
+- extracted tasks can be reviewed before save
+- unclear items are handled safely
+
+### Week 4 — Add Notion Sync and Stabilize Daily Workflow
+
+Tasks:
+
+- implement optional Notion sync
+- build default Notion views
+- test daily task capture flow
+- test status update commands
+- test retrieval after chat reset
+- improve error handling
+- document deployment and maintenance flow on Linux server
+
+Exit criteria:
+
+- Google Sheets remains consistent
+- Notion mirror works
+- daily usage is clear and usable
+- system is ready for MVP launch
+
+---
+
+## Risks and Scope Reductions
+
+### Main Risks
+
+#### 1) Handwriting Extraction Quality
+
+Bad images will reduce accuracy.
+
+Scope control:
+
+- support only clear, well-lit notebook photos in MVP
+
+#### 2) Poor Task / Note Separation
+
+Notebook lines are not always tasks.
+
+Scope control:
+
+- use review-before-save for uncertain lines
+
+#### 3) Google Sheets Complexity Over Time
+
+Sheets can become messy if schema is not controlled.
+
+Scope control:
+
+- keep a strict fixed-column model
+- separate logs into another sheet
+
+#### 4) Notion Sync Drift
+
+Notion can get out of sync or become a second source of truth.
+
+Scope control:
+
+- keep Google Sheets canonical
+- treat Notion as a mirror only
+
+#### 5) Ambiguous Natural-Language Updates
+
+Some update commands may match multiple tasks.
+
+Scope control:
+
+- only allow auto-update on clear matches
+
+#### 6) ngrok Dependency
+
+Fine for MVP, but not ideal long-term.
+
+Scope control:
+
+- use ngrok now
+- replace later if needed
+
+### Scope Reductions if Time Gets Tight
+
+Cut in this order:
+
+1. automatic Notion sync
+2. bulk status update commands
+3. confidence score as a numeric value
+4. advanced duplicate checks
+5. extra config-sheet complexity
+
+Do **not** cut:
+
+- Custom GPT to API connection
+- Google Sheets persistence
+- unique task IDs
+- status updates
+- retrieval queries
+- review-before-save flow
+
+These are the core product features.
+
+---
+
+## Implementation Summary for Builder GPT
+
+Build the MVP around these decisions:
+
+- **Custom GPT** handles UX only.
+- **Backend API** owns processing and business logic.
+- **Google Sheets** is the single source of truth.
+- **Notion** is optional and secondary.
+- **Review-before-save** is required for uncertain extraction.
+- **Task retrieval and updates must work after chat reset or chat deletion.**
+
+This is the implementation-ready architecture for a realistic 30-day MVP.
