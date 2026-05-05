@@ -23,17 +23,19 @@ class SheetsTaskRepository:
     # =========================
     # CREATE
     # =========================
-    def create_task(self, text: str):
+    def create_task(self, text: str, normalized_title: str = None, page_date: str = ""):
         task_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
+
+        title = normalized_title if normalized_title else text
 
         row = [
             task_id,
             text,
-            text,
+            title,
             "General",
             "Pending",
-            "",
+            page_date,
             now,
             "text",
             "manual",
