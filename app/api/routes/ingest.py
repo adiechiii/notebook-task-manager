@@ -3,6 +3,7 @@ from app.schemas.ingest_schema import IngestRequest
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.services.date_parser_service import parse_date_from_text, normalize_task_title
 from app.services.priority_service import parse_priority_from_text
+from app.services.category_service import classify_category
 
 router = APIRouter()
 repo = SheetsTaskRepository()
@@ -22,12 +23,14 @@ def confirm_tasks(request: IngestRequest):
         page_date = parse_date_from_text(task)
         normalized_title = normalize_task_title(task)
         priority = parse_priority_from_text(task)
+        category = classify_category(task)
 
         repo.create_task(
             text=task,
             normalized_title=normalized_title,
             page_date=page_date,
             priority=priority,
+            category=category,
         )
 
         saved.append(task)
