@@ -23,7 +23,7 @@ class SheetsTaskRepository:
     # =========================
     # CREATE
     # =========================
-    def create_task(self, text: str, normalized_title: str = None, page_date: str = "", priority: str = "Medium", category: str = "General"):
+    def create_task(self, text: str, normalized_title: str = None, page_date: str = "", priority: str = "Medium", category: str = "General", duplicate_flag: str = "FALSE", review_required: str = "FALSE"):
         task_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
 
@@ -39,8 +39,8 @@ class SheetsTaskRepository:
             now,
             "text",
             "manual",
-            "FALSE",
-            "FALSE",
+            duplicate_flag,
+            review_required,
             now,
             now,
             "",
