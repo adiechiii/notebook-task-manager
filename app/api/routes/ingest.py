@@ -4,9 +4,16 @@ from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.services.date_parser_service import parse_date_from_text, normalize_task_title
 from app.services.priority_service import parse_priority_from_text
 from app.services.category_service import classify_category
+from app.services.task_parser_service import parse_tasks_from_text
 
 router = APIRouter()
 repo = SheetsTaskRepository()
+
+
+@router.post("/ingest/review")
+def review_tasks(request: IngestRequest):
+    review = parse_tasks_from_text(request.text)
+    return {"review": review}
 
 
 @router.post("/ingest/confirm")
