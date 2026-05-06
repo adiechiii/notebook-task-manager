@@ -120,3 +120,22 @@ class SheetsTaskRepository:
             })
 
         return tasks
+    # =========================
+    # COMMAND CENTER
+    # =========================
+    def get_command_center_tasks(self):
+        rows = self.sheet.get_all_records()
+
+        tasks = []
+
+        for row in rows:
+            tasks.append({
+                "text": row.get("Raw Text"),
+                "title": row.get("Normalized Title"),
+                "status": row.get("Status"),
+                "page_date": str(row.get("Page Date", "")).strip(),
+                "category": row.get("Category"),
+                "priority": row.get("Priority"),
+            })
+
+        return tasks
