@@ -23,7 +23,7 @@ class SheetsTaskRepository:
     # =========================
     # CREATE
     # =========================
-    def create_task(self, text: str, normalized_title: str = None, page_date: str = ""):
+    def create_task(self, text: str, normalized_title: str = None, page_date: str = "", priority: str = "Medium"):
         task_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
 
@@ -43,7 +43,8 @@ class SheetsTaskRepository:
             "FALSE",
             now,
             now,
-            ""
+            "",
+            priority
         ]
 
         self.sheet.append_row(row)
