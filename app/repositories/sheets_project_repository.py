@@ -1,24 +1,12 @@
 import uuid
 from datetime import datetime
 
-import gspread
-from google.oauth2.service_account import Credentials
+from app.integrations.google_sheets_client import get_workbook
 
 
 class SheetsProjectRepository:
     def __init__(self):
-        scope = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-        ]
-
-        creds = Credentials.from_service_account_file(
-            "credentials.json",
-            scopes=scope,
-        )
-
-        client = gspread.authorize(creds)
-        self.sheet = client.open("NotebookTasksDB").worksheet("Projects")
+        self.sheet = get_workbook("NotebookTasksDB").worksheet("Projects")
 
     # =========================
     # CREATE

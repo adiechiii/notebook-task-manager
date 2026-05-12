@@ -1,4 +1,4 @@
-from app.integrations.google_sheets_client import get_client
+from app.integrations.google_sheets_client import get_workbook
 from datetime import datetime
 import uuid
 
@@ -9,8 +9,7 @@ WORKSHEET_NAME = "StatusLog"
 class SheetsStatusLogRepository:
 
     def __init__(self):
-        client = get_client()
-        self.sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
+        self.sheet = get_workbook(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
     def create_log(self, task_id, old_status, new_status, change_source="api"):
         now = datetime.utcnow().isoformat()
