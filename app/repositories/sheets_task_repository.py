@@ -122,6 +122,55 @@ class SheetsTaskRepository:
             })
 
         return tasks
+
+    # =========================
+    # ARCHIVE PREVIEW
+    # =========================
+    def get_archive_preview_candidates(self, status="Done", older_than_days=0, include_done=True):
+        rows = self.sheet.get_all_records()
+        now = datetime.utcnow()
+        candidates = []
+        wanted_status = str(status or "").strip().lower()
+        include_done = bool(include_done)
+        older_than_days = max(int(older_than_days or 0), 0)
+
+        for row in rows:
+            row_status = str(row.get("Status", "")).strip()
+            row_status_lower = row_status.lower()
+
+            if include_done:
+                status_matches = row_status_lower in {wanted_status, "done"}
+            else:
+                status_matches = row_status_lower == wanted_status
+
+            if not status_matches:
+                continue
+
+            date_source = str(row.get("Completion Date") or row.get("Updated At") or "").strip()
+            age_days = None
+
+            if date_source:
+                try:
+                    age_days = (now - datetime.fromisoformat(date_source)).days
+                except ValueError:
+                    age_days = None
+
+            if age_days is not None and age_days < older_than_days:
+                continue
+
+            candidates.append({
+                "task_id": row.get("Task ID"),
+                "text": row.get("Raw Text"),
+                "title": row.get("Normalized Title"),
+                "status": row_status,
+                "project": row.get("Project"),
+                "updated_at": row.get("Updated At"),
+                "completion_date": row.get("Completion Date"),
+                "age_days": age_days,
+            })
+
+        return candidates
+
     # =========================
     # COMMAND CENTER
     # =========================
