@@ -2,6 +2,7 @@ from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.repositories.sheets_memory_repository import SheetsMemoryRepository
 from app.repositories.sheets_project_repository import SheetsProjectRepository
 from app.services.command_center_service import build_command_center
+from app.services.project_rollup_service import build_project_rollups
 
 
 def _clean_bucket(value, default):
@@ -41,6 +42,7 @@ def build_weekly_review(
 
     memories = memory_repo.search_memories("")
     projects = project_repo.search_projects("")
+    project_rollups = build_project_rollups(tasks, memories, projects, command_center)
 
     return {
         "tasks": {
@@ -66,4 +68,5 @@ def build_weekly_review(
             "memories": memories,
             "projects": projects,
         },
+        "project_rollups": project_rollups,
     }
