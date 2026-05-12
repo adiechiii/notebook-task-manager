@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 
 from app.repositories.sheets_memory_repository import SheetsMemoryRepository
 from app.repositories.sheets_project_repository import SheetsProjectRepository
@@ -19,6 +20,10 @@ def _link_key(value):
     return _display_text(value).lower()
 
 
+def _normalized_key_part(value):
+    return re.sub(r"\s+", " ", _display_text(value).lower())
+
+
 def _parse_date(value):
     text = _display_text(value)
     if not text:
@@ -28,6 +33,16 @@ def _parse_date(value):
         return datetime.fromisoformat(text)
     except ValueError:
         return None
+
+
+def _memory_summary(memory):
+    return (
+        memory.get("memory_summary")
+        or memory.get("summary")
+        or memory.get("raw_text")
+        or memory.get("text")
+        or ""
+    )
 
 
 def _empty_task_counts():
@@ -63,6 +78,8 @@ def _empty_response(query, match_type="none", include_details=False):
             "schema_changes": False,
             "linked_task_count": 0,
             "linked_memory_count": 0,
+            "recent_memory_count_raw": 0,
+            "recent_memory_count_deduped": 0,
         },
     }
 
@@ -168,6 +185,25 @@ def _recent_memories(linked_memories):
     )[:RECENT_MEMORY_LIMIT]
 
 
+def _dedupe_recent_memories(memories):
+    deduped = []
+    seen = set()
+
+    for memory in memories:
+        key = (
+            _normalized_key_part(_memory_summary(memory)),
+            _normalized_key_part(memory.get("project")),
+        )
+
+        if not key[0] or key in seen:
+            continue
+
+        seen.add(key)
+        deduped.append(memory)
+
+    return deduped
+
+
 def _next_actions(command_center):
     actions = []
 
@@ -199,7 +235,7 @@ def _slim_task(task):
 def _slim_memory(memory):
     return {
         "memory_id": memory.get("memory_id"),
-        "summary": memory.get("summary") or memory.get("text"),
+        "summary": _memory_summary(memory),
         "type": memory.get("type"),
         "project": memory.get("project"),
         "tags": memory.get("tags"),
@@ -212,8 +248,26 @@ def _limited_slim_tasks(tasks, limit=COMPACT_BUCKET_LIMIT):
     return [_slim_task(task) for task in tasks[:limit]]
 
 
-def _project_metadata(project, linked_tasks, linked_memories, include_details):
+def _project_metadata(
+    project,
+    linked_tasks,
+    linked_memories,
+    include_details,
+    recent_memory_count_raw=None,
+    recent_memory_count_deduped=None,
+):
     response_mode = "full" if include_details else "compact"
+    recent_memory_count_raw = (
+        len(linked_memories)
+        if recent_memory_count_raw is None
+        else recent_memory_count_raw
+    )
+    recent_memory_count_deduped = (
+        recent_memory_count_raw
+        if recent_memory_count_deduped is None
+        else recent_memory_count_deduped
+    )
+
     return {
         "project_name": _display_text(project.get("name")),
         "response_mode": response_mode,
@@ -222,6 +276,8 @@ def _project_metadata(project, linked_tasks, linked_memories, include_details):
         "schema_changes": False,
         "linked_task_count": len(linked_tasks),
         "linked_memory_count": len(linked_memories),
+        "recent_memory_count_raw": recent_memory_count_raw,
+        "recent_memory_count_deduped": recent_memory_count_deduped,
     }
 
 
@@ -234,6 +290,9 @@ def _full_response(
     task_counts,
     command_center,
 ):
+    raw_recent_memories = _recent_memories(linked_memories)
+    deduped_recent_memories = _dedupe_recent_memories(raw_recent_memories)
+
     return {
         "query": raw_query,
         "matched": True,
@@ -245,13 +304,15 @@ def _full_response(
         "overdue_tasks": command_center.get("overdue", []),
         "today_tasks": command_center.get("today", []),
         "no_date_tasks": command_center.get("no_date", []),
-        "recent_memories": _recent_memories(linked_memories),
+        "recent_memories": raw_recent_memories,
         "next_actions": _next_actions(command_center),
         "metadata": _project_metadata(
             matched_project,
             linked_tasks,
             linked_memories,
             include_details=True,
+            recent_memory_count_raw=len(raw_recent_memories),
+            recent_memory_count_deduped=len(deduped_recent_memories),
         ),
     }
 
@@ -265,7 +326,9 @@ def _compact_response(
     task_counts,
     command_center,
 ):
-    recent_memories = [_slim_memory(memory) for memory in _recent_memories(linked_memories)]
+    raw_recent_memories = _recent_memories(linked_memories)
+    deduped_recent_memories = _dedupe_recent_memories(raw_recent_memories)
+    recent_memories = [_slim_memory(memory) for memory in deduped_recent_memories]
     next_actions = [_slim_task(task) for task in _next_actions(command_center)]
 
     return {
@@ -284,6 +347,8 @@ def _compact_response(
             linked_tasks,
             linked_memories,
             include_details=False,
+            recent_memory_count_raw=len(raw_recent_memories),
+            recent_memory_count_deduped=len(deduped_recent_memories),
         ),
     }
 
