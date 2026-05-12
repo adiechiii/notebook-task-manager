@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api.routes import ingest, tasks_update, tasks_delete, tasks_list, tasks_command_center, memory, projects, review
+from app.api.routes import ingest, tasks_update, tasks_delete, tasks_list, tasks_command_center, memory, projects, review, search
 
 app = FastAPI()
 
@@ -11,6 +11,7 @@ app.include_router(tasks_command_center.router)
 app.include_router(memory.router)
 app.include_router(projects.router)
 app.include_router(review.router)
+app.include_router(search.router)
 
 
 @app.get("/")
