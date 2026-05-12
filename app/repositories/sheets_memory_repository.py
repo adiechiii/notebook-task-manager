@@ -23,7 +23,15 @@ class SheetsMemoryRepository:
     # =========================
     # CREATE
     # =========================
-    def create_memory(self, text: str):
+    def create_memory(
+        self,
+        text: str,
+        memory_type: str = "General",
+        entity: str = "",
+        project: str = "",
+        tags: str = "",
+        importance: str = "Medium",
+    ):
         memory_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
 
@@ -33,11 +41,11 @@ class SheetsMemoryRepository:
             memory_id,
             text,
             summary,
-            "General",
-            "",
-            "",
-            "",
-            "Medium",
+            memory_type,
+            entity,
+            project,
+            tags,
+            importance,
             "Active",
             "text",
             "manual",

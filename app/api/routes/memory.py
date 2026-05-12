@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query
 
 from app.repositories.sheets_memory_repository import SheetsMemoryRepository
 from app.schemas.memory_schema import MemoryCreateRequest
+from app.services.memory_classification_service import classify_memory
 
 router = APIRouter()
 repo = SheetsMemoryRepository()
@@ -9,10 +10,19 @@ repo = SheetsMemoryRepository()
 
 @router.post("/memory/create")
 def create_memory(request: MemoryCreateRequest):
-    memory_id = repo.create_memory(request.text)
+    classification = classify_memory(request.text)
+    memory_id = repo.create_memory(
+        request.text,
+        memory_type=classification["type"],
+        entity=classification["entity"],
+        project=classification["project"],
+        tags=classification["tags"],
+        importance=classification["importance"],
+    )
     return {
         "saved": request.text,
         "memory_id": memory_id,
+        "classification": classification,
     }
 
 
