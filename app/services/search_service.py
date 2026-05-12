@@ -68,7 +68,7 @@ def build_search_everything(
         for task in all_tasks
         if _matches_query(
             task,
-            ["text", "title", "status", "page_date", "category", "priority"],
+            ["text", "title", "status", "page_date", "category", "priority", "project"],
             normalized_query,
         )
     ]

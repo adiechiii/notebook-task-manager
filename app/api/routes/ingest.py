@@ -6,6 +6,7 @@ from app.services.priority_service import parse_priority_from_text
 from app.services.category_service import classify_category
 from app.services.task_parser_service import parse_tasks_from_text
 from app.services.duplicate_detection_service import find_duplicate_task
+from app.services.project_linking_service import resolve_project
 
 router = APIRouter()
 repo = SheetsTaskRepository()
@@ -17,6 +18,10 @@ def review_tasks(request: IngestRequest):
     review = parse_tasks_from_text(request.text)
 
     for task in review:
+        task["project"] = resolve_project(
+            task.get("raw_text", ""),
+            request.project or "",
+        )
         duplicate_result = find_duplicate_task(task, existing_tasks)
         task.update(duplicate_result)
 
@@ -38,6 +43,7 @@ def confirm_tasks(request: IngestRequest):
         normalized_title = normalize_task_title(task)
         priority = parse_priority_from_text(task)
         category = classify_category(task)
+        project = resolve_project(task, request.project or "")
 
         duplicate_result = find_duplicate_task(
             {
@@ -58,6 +64,7 @@ def confirm_tasks(request: IngestRequest):
             category=category,
             duplicate_flag=duplicate_flag,
             review_required=review_required,
+            project=project,
         )
 
         saved.append(task)

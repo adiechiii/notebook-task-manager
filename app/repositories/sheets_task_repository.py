@@ -23,7 +23,7 @@ class SheetsTaskRepository:
     # =========================
     # CREATE
     # =========================
-    def create_task(self, text: str, normalized_title: str = None, page_date: str = "", priority: str = "Medium", category: str = "General", duplicate_flag: str = "FALSE", review_required: str = "FALSE"):
+    def create_task(self, text: str, normalized_title: str = None, page_date: str = "", priority: str = "Medium", category: str = "General", duplicate_flag: str = "FALSE", review_required: str = "FALSE", project: str = ""):
         task_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
 
@@ -44,7 +44,8 @@ class SheetsTaskRepository:
             now,
             now,
             "",
-            priority
+            priority,
+            project
         ]
 
         self.sheet.append_row(row)
@@ -116,7 +117,8 @@ class SheetsTaskRepository:
 
             tasks.append({
                 "text": row.get("Raw Text"),
-                "status": row.get("Status")
+                "status": row.get("Status"),
+                "project": row.get("Project"),
             })
 
         return tasks
@@ -136,6 +138,7 @@ class SheetsTaskRepository:
                 "page_date": str(row.get("Page Date", "")).strip(),
                 "category": row.get("Category"),
                 "priority": row.get("Priority"),
+                "project": row.get("Project"),
             })
 
         return tasks
