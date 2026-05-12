@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query
 
 from app.repositories.sheets_project_repository import SheetsProjectRepository
 from app.schemas.project_schema import ProjectCreateRequest
+from app.services.project_dashboard_service import build_project_dashboard
 
 router = APIRouter()
 repo = SheetsProjectRepository()
@@ -24,3 +25,8 @@ def create_project(request: ProjectCreateRequest):
 def search_projects(query: str = Query(default="")):
     projects = repo.search_projects(query)
     return {"projects": projects}
+
+
+@router.get("/projects/dashboard")
+def get_project_dashboard(query: str = Query(default="")):
+    return build_project_dashboard(query)
