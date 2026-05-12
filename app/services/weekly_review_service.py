@@ -61,4 +61,9 @@ def build_weekly_review(
             "total": len(projects),
             "active": _count_active(projects),
         },
+        "details": {
+            "tasks": command_center,
+            "memories": memories,
+            "projects": projects,
+        },
     }
