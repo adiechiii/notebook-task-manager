@@ -28,5 +28,8 @@ def search_projects(query: str = Query(default="")):
 
 
 @router.get("/projects/dashboard")
-def get_project_dashboard(query: str = Query(default="")):
-    return build_project_dashboard(query)
+def get_project_dashboard(
+    query: str = Query(default=""),
+    include_details: bool = Query(default=False),
+):
+    return build_project_dashboard(query, include_details=include_details)

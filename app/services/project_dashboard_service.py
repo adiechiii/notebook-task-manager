@@ -8,6 +8,7 @@ from app.services.command_center_service import build_command_center
 
 RECENT_MEMORY_LIMIT = 5
 NEXT_ACTION_LIMIT = 5
+COMPACT_BUCKET_LIMIT = 5
 
 
 def _display_text(value):
@@ -41,14 +42,13 @@ def _empty_task_counts():
     }
 
 
-def _empty_response(query, match_type="none"):
-    return {
+def _empty_response(query, match_type="none", include_details=False):
+    response_mode = "full" if include_details else "compact"
+    response = {
         "query": query,
         "matched": False,
         "match_type": match_type,
         "matched_project": None,
-        "linked_tasks": [],
-        "linked_memories": [],
         "task_counts": _empty_task_counts(),
         "overdue_tasks": [],
         "today_tasks": [],
@@ -57,12 +57,20 @@ def _empty_response(query, match_type="none"):
         "next_actions": [],
         "metadata": {
             "project_name": "",
+            "response_mode": response_mode,
+            "include_details": include_details,
             "uses_string_project_linking": True,
             "schema_changes": False,
             "linked_task_count": 0,
             "linked_memory_count": 0,
         },
     }
+
+    if include_details:
+        response["linked_tasks"] = []
+        response["linked_memories"] = []
+
+    return response
 
 
 def _match_project(query, projects):
@@ -176,9 +184,40 @@ def _next_actions(command_center):
     return actions
 
 
-def _project_metadata(project, linked_tasks, linked_memories):
+def _slim_task(task):
+    return {
+        "task_id": task.get("task_id"),
+        "title": task.get("title") or task.get("text"),
+        "status": task.get("status"),
+        "page_date": task.get("page_date"),
+        "category": task.get("category"),
+        "priority": task.get("priority"),
+        "project": task.get("project"),
+    }
+
+
+def _slim_memory(memory):
+    return {
+        "memory_id": memory.get("memory_id"),
+        "summary": memory.get("summary") or memory.get("text"),
+        "type": memory.get("type"),
+        "project": memory.get("project"),
+        "tags": memory.get("tags"),
+        "importance": memory.get("importance"),
+        "created_at": memory.get("created_at"),
+    }
+
+
+def _limited_slim_tasks(tasks, limit=COMPACT_BUCKET_LIMIT):
+    return [_slim_task(task) for task in tasks[:limit]]
+
+
+def _project_metadata(project, linked_tasks, linked_memories, include_details):
+    response_mode = "full" if include_details else "compact"
     return {
         "project_name": _display_text(project.get("name")),
+        "response_mode": response_mode,
+        "include_details": include_details,
         "uses_string_project_linking": True,
         "schema_changes": False,
         "linked_task_count": len(linked_tasks),
@@ -186,8 +225,72 @@ def _project_metadata(project, linked_tasks, linked_memories):
     }
 
 
+def _full_response(
+    raw_query,
+    match_type,
+    matched_project,
+    linked_tasks,
+    linked_memories,
+    task_counts,
+    command_center,
+):
+    return {
+        "query": raw_query,
+        "matched": True,
+        "match_type": match_type,
+        "matched_project": matched_project,
+        "linked_tasks": linked_tasks,
+        "linked_memories": linked_memories,
+        "task_counts": task_counts,
+        "overdue_tasks": command_center.get("overdue", []),
+        "today_tasks": command_center.get("today", []),
+        "no_date_tasks": command_center.get("no_date", []),
+        "recent_memories": _recent_memories(linked_memories),
+        "next_actions": _next_actions(command_center),
+        "metadata": _project_metadata(
+            matched_project,
+            linked_tasks,
+            linked_memories,
+            include_details=True,
+        ),
+    }
+
+
+def _compact_response(
+    raw_query,
+    match_type,
+    matched_project,
+    linked_tasks,
+    linked_memories,
+    task_counts,
+    command_center,
+):
+    recent_memories = [_slim_memory(memory) for memory in _recent_memories(linked_memories)]
+    next_actions = [_slim_task(task) for task in _next_actions(command_center)]
+
+    return {
+        "query": raw_query,
+        "matched": True,
+        "match_type": match_type,
+        "matched_project": matched_project,
+        "task_counts": task_counts,
+        "overdue_tasks": _limited_slim_tasks(command_center.get("overdue", [])),
+        "today_tasks": _limited_slim_tasks(command_center.get("today", [])),
+        "no_date_tasks": _limited_slim_tasks(command_center.get("no_date", [])),
+        "recent_memories": recent_memories,
+        "next_actions": next_actions,
+        "metadata": _project_metadata(
+            matched_project,
+            linked_tasks,
+            linked_memories,
+            include_details=False,
+        ),
+    }
+
+
 def build_project_dashboard(
     query,
+    include_details=False,
     project_repo=None,
     task_repo=None,
     memory_repo=None,
@@ -201,7 +304,7 @@ def build_project_dashboard(
     matched_project, match_type = _match_project(raw_query, projects)
 
     if not matched_project:
-        return _empty_response(raw_query)
+        return _empty_response(raw_query, include_details=include_details)
 
     project_name = _display_text(matched_project.get("name"))
     project_key = _link_key(project_name)
@@ -222,18 +325,23 @@ def build_project_dashboard(
     task_counts["today"] = len(command_center.get("today", []))
     task_counts["no_date"] = len(command_center.get("no_date", []))
 
-    return {
-        "query": raw_query,
-        "matched": True,
-        "match_type": match_type,
-        "matched_project": matched_project,
-        "linked_tasks": linked_tasks,
-        "linked_memories": linked_memories,
-        "task_counts": task_counts,
-        "overdue_tasks": command_center.get("overdue", []),
-        "today_tasks": command_center.get("today", []),
-        "no_date_tasks": command_center.get("no_date", []),
-        "recent_memories": _recent_memories(linked_memories),
-        "next_actions": _next_actions(command_center),
-        "metadata": _project_metadata(matched_project, linked_tasks, linked_memories),
-    }
+    if include_details:
+        return _full_response(
+            raw_query,
+            match_type,
+            matched_project,
+            linked_tasks,
+            linked_memories,
+            task_counts,
+            command_center,
+        )
+
+    return _compact_response(
+        raw_query,
+        match_type,
+        matched_project,
+        linked_tasks,
+        linked_memories,
+        task_counts,
+        command_center,
+    )
