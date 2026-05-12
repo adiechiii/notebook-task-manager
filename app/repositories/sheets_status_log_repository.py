@@ -12,7 +12,7 @@ class SheetsStatusLogRepository:
         client = get_client()
         self.sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
-    def log_status_change(self, task_id, old_status, new_status):
+    def create_log(self, task_id, old_status, new_status, change_source="api"):
         now = datetime.utcnow().isoformat()
 
         row = [
@@ -21,7 +21,10 @@ class SheetsStatusLogRepository:
             old_status,
             new_status,
             now,
-            "api"
+            change_source
         ]
 
         self.sheet.append_row(row)
+
+    def log_status_change(self, task_id, old_status, new_status):
+        self.create_log(task_id, old_status, new_status)

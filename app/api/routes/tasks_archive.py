@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
+from app.repositories.sheets_status_log_repository import SheetsStatusLogRepository
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.schemas.archive_schema import ArchiveRequest
 
 router = APIRouter()
 repo = SheetsTaskRepository()
+status_log_repo = SheetsStatusLogRepository()
 
 ARCHIVE_CONFIRMATION = "ARCHIVE COMPLETED TASKS"
 ARCHIVABLE_STATUSES = {"done", "completed"}
@@ -94,10 +96,21 @@ def archive_tasks(request: ArchiveRequest):
     if not archived:
         warnings.append("No archive candidates found.")
 
+    logged_count = 0
+    for task in archived:
+        status_log_repo.create_log(
+            task.get("task_id"),
+            task.get("previous_status"),
+            "Archived",
+            change_source="archive",
+        )
+        logged_count += 1
+
     return {
         "dry_run": False,
         "archived_count": len(archived),
         "criteria": criteria,
         "archived": archived,
         "warnings": warnings,
+        "logged_count": logged_count,
     }

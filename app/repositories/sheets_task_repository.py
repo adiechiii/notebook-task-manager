@@ -64,7 +64,8 @@ class SheetsTaskRepository:
             if raw == search or search in raw or raw in search:
                 return {
                     "task_id": row.get("Task ID"),
-                    "row": i + 2
+                    "row": i + 2,
+                    "status": row.get("Status")
                 }
 
         return None
