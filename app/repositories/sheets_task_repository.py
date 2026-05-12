@@ -171,6 +171,78 @@ class SheetsTaskRepository:
 
         return candidates
 
+    def archive_tasks(self, status="Done", older_than_days=0, include_done=True):
+        candidates = self.get_archive_preview_candidates(
+            status=status,
+            older_than_days=older_than_days,
+            include_done=include_done,
+        )
+        candidate_ids = {candidate.get("task_id") for candidate in candidates}
+        warnings = []
+
+        if not candidate_ids:
+            return [], warnings
+
+        rows = self.sheet.get_all_records()
+        row_updates = []
+        seen_task_ids = set()
+        allowed_statuses = {"done", "completed"}
+
+        for i, row in enumerate(rows):
+            task_id = row.get("Task ID")
+            if task_id not in candidate_ids:
+                continue
+
+            row_status = str(row.get("Status", "")).strip()
+            row_status_lower = row_status.lower()
+
+            if not task_id:
+                warnings.append("Archive blocked because a candidate is missing Task ID.")
+                return [], warnings
+
+            if task_id in seen_task_ids:
+                warnings.append("Archive blocked because duplicate candidate Task IDs were found.")
+                return [], warnings
+
+            seen_task_ids.add(task_id)
+
+            if row_status_lower not in allowed_statuses:
+                warnings.append("Archive blocked because a candidate is no longer Done or Completed.")
+                return [], warnings
+
+            row_updates.append({
+                "row_num": i + 2,
+                "task": {
+                    "task_id": task_id,
+                    "text": row.get("Raw Text"),
+                    "title": row.get("Normalized Title"),
+                    "status": "Archived",
+                    "previous_status": row_status,
+                    "project": row.get("Project"),
+                    "updated_at": None,
+                    "completion_date": row.get("Completion Date"),
+                },
+            })
+
+        if len(row_updates) != len(candidate_ids):
+            warnings.append("Archive blocked because one or more candidates could not be re-validated.")
+            return [], warnings
+
+        now = datetime.utcnow().isoformat()
+        archived = []
+
+        for update in row_updates:
+            row_num = update["row_num"]
+            task = update["task"]
+
+            self.sheet.update_cell(row_num, 5, "Archived")
+            self.sheet.update_cell(row_num, 13, now)
+
+            task["updated_at"] = now
+            archived.append(task)
+
+        return archived, warnings
+
     # =========================
     # COMMAND CENTER
     # =========================
@@ -180,6 +252,9 @@ class SheetsTaskRepository:
         tasks = []
 
         for row in rows:
+            if str(row.get("Status", "")).strip().lower() == "archived":
+                continue
+
             tasks.append({
                 "text": row.get("Raw Text"),
                 "title": row.get("Normalized Title"),

@@ -1,9 +1,14 @@
 from fastapi import APIRouter, Query
+from fastapi.responses import JSONResponse
 
 from app.repositories.sheets_task_repository import SheetsTaskRepository
+from app.schemas.archive_schema import ArchiveRequest
 
 router = APIRouter()
 repo = SheetsTaskRepository()
+
+ARCHIVE_CONFIRMATION = "ARCHIVE COMPLETED TASKS"
+ARCHIVABLE_STATUSES = {"done", "completed"}
 
 
 @router.get("/tasks/archive-preview")
@@ -31,5 +36,68 @@ def get_archive_preview(
             "include_done": include_done,
         },
         "candidates": candidates,
+        "warnings": warnings,
+    }
+
+
+@router.post("/tasks/archive")
+def archive_tasks(request: ArchiveRequest):
+    criteria = {
+        "status": request.status,
+        "older_than_days": request.older_than_days,
+        "include_done": request.include_done,
+    }
+
+    if request.confirm != ARCHIVE_CONFIRMATION:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "dry_run": False,
+                "archived_count": 0,
+                "criteria": criteria,
+                "archived": [],
+                "warnings": ["Exact confirmation phrase is required. No tasks were archived."],
+            },
+        )
+
+    requested_status = str(request.status or "").strip().lower()
+    if requested_status not in ARCHIVABLE_STATUSES:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "dry_run": False,
+                "archived_count": 0,
+                "criteria": criteria,
+                "archived": [],
+                "warnings": ["Only Done or Completed tasks can be archived. No tasks were archived."],
+            },
+        )
+
+    if request.older_than_days < 0:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "dry_run": False,
+                "archived_count": 0,
+                "criteria": criteria,
+                "archived": [],
+                "warnings": ["older_than_days must be greater than or equal to 0. No tasks were archived."],
+            },
+        )
+
+    archived, warnings = repo.archive_tasks(
+        status=request.status,
+        older_than_days=request.older_than_days,
+        include_done=request.include_done,
+    )
+
+    if not archived:
+        warnings.append("No archive candidates found.")
+
+    return {
+        "dry_run": False,
+        "archived_count": len(archived),
+        "criteria": criteria,
+        "archived": archived,
         "warnings": warnings,
     }
