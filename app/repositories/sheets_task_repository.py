@@ -255,3 +255,29 @@ class SheetsTaskRepository:
             })
 
         return tasks
+
+    def get_active_tasks_for_duplicate_cleanup(self):
+        rows = self.sheet.get_all_records()
+
+        tasks = []
+
+        for row in rows:
+            if str(row.get("Status", "")).strip().lower() == "archived":
+                continue
+
+            tasks.append({
+                "task_id": row.get("Task ID"),
+                "text": row.get("Raw Text"),
+                "title": row.get("Normalized Title"),
+                "status": row.get("Status"),
+                "page_date": str(row.get("Page Date", "")).strip(),
+                "category": row.get("Category"),
+                "priority": row.get("Priority"),
+                "project": row.get("Project"),
+                "created_at": row.get("Created At"),
+                "updated_at": row.get("Updated At"),
+                "duplicate_flag": row.get("Duplicate Flag"),
+                "review_required": row.get("Review Required"),
+            })
+
+        return tasks
