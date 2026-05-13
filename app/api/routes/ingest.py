@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from app.schemas.ingest_schema import IngestRequest
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.services.date_parser_service import parse_date_from_text, normalize_task_title
@@ -12,19 +12,33 @@ router = APIRouter()
 repo = SheetsTaskRepository()
 
 
-@router.post("/ingest/review")
-def review_tasks(request: IngestRequest):
+def build_task_review(text: str, project: str = ""):
     existing_tasks = repo.sheet.get_all_records()
-    review = parse_tasks_from_text(request.text)
+    review = parse_tasks_from_text(text)
 
     for task in review:
         task["project"] = resolve_project(
             task.get("raw_text", ""),
-            request.project or "",
+            project or "",
         )
         duplicate_result = find_duplicate_task(task, existing_tasks)
         task.update(duplicate_result)
 
+    return review
+
+
+@router.post("/ingest/review")
+def review_tasks(request: IngestRequest):
+    review = build_task_review(request.text, request.project)
+    return {"review": review}
+
+
+@router.get("/ingest/preview", operation_id="getTaskPreview")
+def preview_tasks(
+    text: str = Query(...),
+    project: str = Query(""),
+):
+    review = build_task_review(text, project)
     return {"review": review}
 
 
