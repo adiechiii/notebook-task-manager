@@ -2,6 +2,7 @@ from datetime import datetime
 
 from app.repositories.sheets_memory_repository import SheetsMemoryRepository
 from app.repositories.sheets_project_repository import SheetsProjectRepository
+from app.repositories.sheets_status_log_repository import SheetsStatusLogRepository
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.services.command_center_service import build_command_center
 from app.services.project_rollup_service import build_project_rollups
@@ -133,10 +134,22 @@ def _summary(command_center, memories_captured_today):
     }
 
 
-def _warnings(project_rollups):
-    warnings = [
-        "Archived/completed history is limited until StatusLog read support is added."
-    ]
+def _status_log_warning(status_log_error=None, skipped_invalid_dates=0):
+    if status_log_error:
+        return "Archived/completed history is limited because StatusLog could not be read."
+
+    if skipped_invalid_dates:
+        return "Some StatusLog rows have invalid Changed At values and were skipped."
+
+    return None
+
+
+def _warnings(project_rollups, status_log_error=None, skipped_invalid_dates=0):
+    warnings = []
+    status_warning = _status_log_warning(status_log_error, skipped_invalid_dates)
+
+    if status_warning:
+        warnings.append(status_warning)
 
     if project_rollups.get("unlinked_tasks", 0):
         warnings.append("Some tasks are not linked to a project.")
@@ -149,34 +162,77 @@ def _warnings(project_rollups):
     return warnings
 
 
+def _today_status_logs(status_log_repo, today):
+    result = status_log_repo.get_logs_for_date(today)
+    logs = result.get("logs", [])
+    skipped_invalid_dates = result.get("skipped_invalid_dates", 0)
+
+    return logs, skipped_invalid_dates
+
+
 def build_night_review(
     task_repo=None,
     memory_repo=None,
     project_repo=None,
+    status_log_repo=None,
 ):
     task_repo = task_repo or SheetsTaskRepository()
     memory_repo = memory_repo or SheetsMemoryRepository()
     project_repo = project_repo or SheetsProjectRepository()
+    status_log_repo = status_log_repo or SheetsStatusLogRepository()
 
+    today = datetime.utcnow().date()
     tasks = task_repo.get_command_center_tasks()
     command_center = build_command_center(tasks)
     memories = memory_repo.search_memories("")
     projects = project_repo.search_projects("")
     project_rollups = build_project_rollups(tasks, memories, projects, command_center)
     memories_captured_today = _today_memory_rows(memory_repo)
+    status_log_error = None
+    skipped_invalid_dates = 0
+
+    try:
+        status_changes_today, skipped_invalid_dates = _today_status_logs(
+            status_log_repo,
+            today,
+        )
+    except Exception:
+        status_changes_today = []
+        status_log_error = True
+
+    completed_today = [
+        log
+        for log in status_changes_today
+        if _display_text(log.get("new_status")).casefold() == "done"
+    ]
+    archived_today = [
+        log
+        for log in status_changes_today
+        if _display_text(log.get("new_status")).casefold() == "archived"
+    ]
+    status_changes_today = status_changes_today[:10]
 
     return {
-        "date": datetime.utcnow().date().isoformat(),
+        "date": today.isoformat(),
         "summary": _summary(command_center, memories_captured_today),
         "completed_tasks": _completed_tasks(command_center),
         "remaining_tasks": _remaining_tasks(command_center),
         "archived_or_done_summary": {
             "visible_done_count": len(command_center.get("done", [])),
-            "archived_count": None,
-            "history_limited": True,
+            "archived_count": len(archived_today) if not status_log_error else None,
+            "history_limited": bool(status_log_error),
+            "completed_today_count": len(completed_today),
+            "archived_today_count": len(archived_today),
         },
+        "completed_today": completed_today,
+        "archived_today": archived_today,
+        "status_changes_today": status_changes_today,
         "memories_captured_today": memories_captured_today,
         "project_progress": _project_progress(project_rollups),
         "suggested_tomorrow_carryover": _suggested_tomorrow_carryover(command_center),
-        "warnings": _warnings(project_rollups),
+        "warnings": _warnings(
+            project_rollups,
+            status_log_error=status_log_error,
+            skipped_invalid_dates=skipped_invalid_dates,
+        ),
     }
