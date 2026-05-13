@@ -232,6 +232,66 @@ class SheetsTaskRepository:
 
         return archived, warnings
 
+    def archive_duplicate_task_ids(self, task_ids):
+        requested_ids = {str(task_id or "").strip() for task_id in task_ids}
+        requested_ids.discard("")
+        warnings = []
+
+        if not requested_ids:
+            return [], warnings
+
+        rows = self.sheet.get_all_records()
+        row_updates = []
+        seen_task_ids = set()
+
+        for i, row in enumerate(rows):
+            task_id = str(row.get("Task ID") or "").strip()
+            if task_id not in requested_ids:
+                continue
+
+            if task_id in seen_task_ids:
+                warnings.append("Duplicate cleanup archive blocked because duplicate Task IDs were found.")
+                return [], warnings
+
+            seen_task_ids.add(task_id)
+
+            row_status = str(row.get("Status", "")).strip()
+            if row_status.lower() == "archived":
+                warnings.append("Duplicate cleanup archive blocked because a candidate is already Archived.")
+                return [], warnings
+
+            row_updates.append({
+                "row_num": i + 2,
+                "task": {
+                    "task_id": task_id,
+                    "text": row.get("Raw Text"),
+                    "title": row.get("Normalized Title"),
+                    "status": "Archived",
+                    "previous_status": row_status,
+                    "project": row.get("Project"),
+                    "updated_at": None,
+                },
+            })
+
+        if len(row_updates) != len(requested_ids):
+            warnings.append("Duplicate cleanup archive blocked because one or more Task IDs could not be re-validated.")
+            return [], warnings
+
+        now = datetime.utcnow().isoformat()
+        archived = []
+
+        for update in row_updates:
+            row_num = update["row_num"]
+            task = update["task"]
+
+            self.sheet.update_cell(row_num, 5, "Archived")
+            self.sheet.update_cell(row_num, 13, now)
+
+            task["updated_at"] = now
+            archived.append(task)
+
+        return archived, warnings
+
     # =========================
     # COMMAND CENTER
     # =========================
