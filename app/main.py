@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api.routes import ingest, tasks_update, tasks_delete, tasks_list, tasks_command_center, tasks_archive, tasks_duplicates, tasks_duplicates_plan, tasks_duplicates_archive, memory, projects, review, search, summary, health, brief, night_review, focus
+from app.api.routes import ingest, tasks_update, tasks_delete, tasks_list, tasks_command_center, tasks_archive, tasks_duplicates, tasks_duplicates_plan, tasks_duplicates_archive, recurring_tasks_preview, memory, projects, review, search, summary, health, brief, night_review, focus
 
 app = FastAPI()
 
@@ -12,6 +12,7 @@ app.include_router(tasks_archive.router)
 app.include_router(tasks_duplicates.router)
 app.include_router(tasks_duplicates_plan.router)
 app.include_router(tasks_duplicates_archive.router)
+app.include_router(recurring_tasks_preview.router)
 app.include_router(memory.router)
 app.include_router(projects.router)
 app.include_router(review.router)
