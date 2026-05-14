@@ -1,12 +1,18 @@
+import uuid
+from datetime import datetime
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.schemas.thought_schema import (
+    CREATE_THOUGHT_CONFIRMATION,
     CREATE_THOUGHTS_WORKSHEET_CONFIRMATION,
     SUGGESTED_THOUGHT_TYPES,
     THOUGHTS_HEADERS,
     THOUGHTS_SCHEMA_PREVIEW_WARNINGS,
     THOUGHTS_WORKSHEET_NAME,
+    ThoughtCreateRequest,
+    ThoughtCreateResponse,
     ThoughtCreatePreviewRequest,
     ThoughtCreatePreviewResponse,
     ThoughtPreviewItem,
@@ -125,6 +131,27 @@ def _preview_item(request: ThoughtCreatePreviewRequest) -> ThoughtPreviewItem:
     )
 
 
+def _created_item(request: ThoughtCreateRequest) -> ThoughtPreviewItem:
+    now = datetime.utcnow().isoformat()
+    raw_thought = _clean(request.raw_thought)
+    summary = _clean(request.summary) or raw_thought
+
+    return ThoughtPreviewItem(
+        thought_id=str(uuid.uuid4()),
+        raw_thought=raw_thought,
+        summary=summary,
+        thought_type=_clean(request.thought_type) or "Reflection",
+        mood=_clean(request.mood),
+        energy=_clean(request.energy),
+        project=_clean(request.project),
+        tags=_clean(request.tags),
+        status=_clean(request.status) or "Active",
+        source_type=_clean(request.source_type) or "text",
+        created_at=now,
+        updated_at=now,
+    )
+
+
 @router.post(
     "/thoughts/create-preview",
     response_model=ThoughtCreatePreviewResponse,
@@ -175,5 +202,80 @@ def preview_thought_create(request: ThoughtCreatePreviewRequest):
         schema_ok=True,
         duplicate_candidates=duplicate_candidates,
         thought=preview_thought,
+        warnings=warnings,
+    )
+
+
+@router.post(
+    "/thoughts/create",
+    response_model=ThoughtCreateResponse,
+)
+def create_thought(request: ThoughtCreateRequest):
+    if request.confirmation != CREATE_THOUGHT_CONFIRMATION:
+        return JSONResponse(
+            status_code=400,
+            content=ThoughtCreateResponse(
+                created=False,
+                schema_ok=False,
+                duplicate_candidates=[],
+                thought=_preview_item(request),
+                warnings=[
+                    "Exact confirmation phrase is required. No thought was created.",
+                ],
+            ).model_dump(),
+        )
+
+    thought = _created_item(request)
+
+    if not thought.raw_thought:
+        return JSONResponse(
+            status_code=400,
+            content=ThoughtCreateResponse(
+                created=False,
+                schema_ok=True,
+                duplicate_candidates=[],
+                thought=thought,
+                warnings=[
+                    "Raw thought is required. No thought was created.",
+                ],
+            ).model_dump(),
+        )
+
+    from app.repositories.sheets_thought_repository import SheetsThoughtRepository
+
+    repo = SheetsThoughtRepository()
+    inspection = repo.inspect_schema()
+
+    if not inspection["exists"] or inspection["headers_match"] is not True:
+        warnings = list(inspection["warnings"])
+        warnings.append("Thoughts schema must exist with approved headers before thoughts can be created.")
+        return JSONResponse(
+            status_code=400,
+            content=ThoughtCreateResponse(
+                created=False,
+                schema_ok=False,
+                duplicate_candidates=[],
+                thought=thought,
+                warnings=warnings,
+            ).model_dump(),
+        )
+
+    duplicate_candidates = repo.find_duplicate_candidates(
+        thought.raw_thought,
+        thought.project,
+    )
+    warnings = []
+
+    if duplicate_candidates:
+        warnings.append("Possible duplicate thought found. Thought was created anyway.")
+
+    result = repo.create_thought(thought.model_dump())
+    warnings.extend(result["warnings"])
+
+    return ThoughtCreateResponse(
+        created=result["created"],
+        schema_ok=result["schema_ok"],
+        duplicate_candidates=duplicate_candidates,
+        thought=result["thought"],
         warnings=warnings,
     )

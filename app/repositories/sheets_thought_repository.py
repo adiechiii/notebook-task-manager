@@ -106,6 +106,40 @@ class SheetsThoughtRepository:
 
         return candidates
 
+    def create_thought(self, thought: dict):
+        inspection = self.inspect_schema()
+
+        if not inspection["exists"] or inspection["headers_match"] is not True:
+            return {
+                "created": False,
+                "schema_ok": False,
+                "thought": thought,
+                "warnings": inspection["warnings"],
+            }
+
+        row = [
+            thought["thought_id"],
+            thought["raw_thought"],
+            thought["summary"],
+            thought["thought_type"],
+            thought["mood"],
+            thought["energy"],
+            thought["project"],
+            thought["tags"],
+            thought["status"],
+            thought["source_type"],
+            thought["created_at"],
+            thought["updated_at"],
+        ]
+        self._worksheet().append_row(row)
+
+        return {
+            "created": True,
+            "schema_ok": True,
+            "thought": thought,
+            "warnings": [],
+        }
+
 
 def _normalized_key(value):
     return " ".join(str(value or "").strip().lower().split())

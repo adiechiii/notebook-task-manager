@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 THOUGHTS_WORKSHEET_NAME = "Thoughts"
 CREATE_THOUGHTS_WORKSHEET_CONFIRMATION = "CREATE THOUGHTS WORKSHEET"
+CREATE_THOUGHT_CONFIRMATION = "CREATE THOUGHT"
 THOUGHTS_HEADERS = [
     "Thought ID",
     "Raw Thought",
@@ -89,6 +90,18 @@ class ThoughtPreviewItem(BaseModel):
 class ThoughtCreatePreviewResponse(BaseModel):
     dry_run: bool
     would_create_thought: bool
+    schema_ok: bool
+    duplicate_candidates: list[ThoughtPreviewItem]
+    thought: ThoughtPreviewItem
+    warnings: list[str]
+
+
+class ThoughtCreateRequest(ThoughtCreatePreviewRequest):
+    confirmation: str
+
+
+class ThoughtCreateResponse(BaseModel):
+    created: bool
     schema_ok: bool
     duplicate_candidates: list[ThoughtPreviewItem]
     thought: ThoughtPreviewItem
