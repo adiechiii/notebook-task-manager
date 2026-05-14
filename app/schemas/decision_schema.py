@@ -50,3 +50,43 @@ class DecisionSchemaSetupResponse(BaseModel):
     expected_headers: list[str]
     existing_headers: list[str]
     warnings: list[str]
+
+
+class DecisionCreatePreviewRequest(BaseModel):
+    decision: str
+    context: str = ""
+    rationale: str = ""
+    outcome: str = ""
+    tradeoffs: str = ""
+    project: str = ""
+    tags: str = ""
+    status: str = ""
+    importance: str = ""
+    source_type: str = ""
+    capture_source: str = ""
+
+
+class DecisionPreviewItem(BaseModel):
+    decision_id: str | None = None
+    decision: str
+    context: str = ""
+    rationale: str = ""
+    outcome: str = ""
+    tradeoffs: str = ""
+    project: str = ""
+    tags: str = ""
+    status: str
+    importance: str
+    source_type: str
+    capture_source: str
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class DecisionCreatePreviewResponse(BaseModel):
+    dry_run: bool
+    would_create_decision: bool
+    schema_ok: bool
+    duplicate_candidates: list[DecisionPreviewItem]
+    decision: DecisionPreviewItem
+    warnings: list[str]

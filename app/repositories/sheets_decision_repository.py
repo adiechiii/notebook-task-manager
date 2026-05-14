@@ -79,3 +79,52 @@ class SheetsDecisionRepository:
             "warnings": [],
             "created_worksheet": True,
         }
+
+    def _worksheet(self):
+        return self.workbook.worksheet(DECISIONS_WORKSHEET_NAME)
+
+    def read_decisions(self):
+        return self._worksheet().get_all_records()
+
+    def find_duplicate_candidates(self, decision: str, project: str = ""):
+        wanted_decision = _normalized_key(decision)
+        wanted_project = _normalized_key(project)
+        candidates = []
+
+        if not wanted_decision:
+            return candidates
+
+        for row in self.read_decisions():
+            row_decision = _normalized_key(row.get("Decision"))
+            row_project = _normalized_key(row.get("Project"))
+
+            if row_decision != wanted_decision:
+                continue
+
+            if row_project == wanted_project or not row_project or not wanted_project:
+                candidates.append(_decision_from_row(row))
+
+        return candidates
+
+
+def _normalized_key(value):
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _decision_from_row(row):
+    return {
+        "decision_id": row.get("Decision ID"),
+        "decision": row.get("Decision") or "",
+        "context": row.get("Context") or "",
+        "rationale": row.get("Rationale") or "",
+        "outcome": row.get("Outcome") or "",
+        "tradeoffs": row.get("Tradeoffs") or "",
+        "project": row.get("Project") or "",
+        "tags": row.get("Tags") or "",
+        "status": row.get("Status") or "",
+        "importance": row.get("Importance") or "",
+        "source_type": row.get("Source Type") or "",
+        "capture_source": row.get("Capture Source") or "",
+        "created_at": row.get("Created At") or None,
+        "updated_at": row.get("Updated At") or None,
+    }

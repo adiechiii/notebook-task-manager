@@ -6,6 +6,9 @@ from app.schemas.decision_schema import (
     DECISIONS_HEADERS,
     DECISIONS_SCHEMA_PREVIEW_WARNINGS,
     DECISIONS_WORKSHEET_NAME,
+    DecisionCreatePreviewRequest,
+    DecisionCreatePreviewResponse,
+    DecisionPreviewItem,
     DecisionSchemaSetupRequest,
     DecisionSchemaSetupResponse,
     DecisionSchemaPreviewResponse,
@@ -93,4 +96,69 @@ def setup_decisions_schema(request: DecisionSchemaSetupRequest):
         inspection=result,
         creates_worksheet=creates_worksheet,
         created_worksheet=result["created_worksheet"],
+    )
+
+
+def _clean(value: str) -> str:
+    return str(value or "").strip()
+
+
+def _preview_item(request: DecisionCreatePreviewRequest) -> DecisionPreviewItem:
+    return DecisionPreviewItem(
+        decision_id=None,
+        decision=_clean(request.decision),
+        context=_clean(request.context),
+        rationale=_clean(request.rationale),
+        outcome=_clean(request.outcome),
+        tradeoffs=_clean(request.tradeoffs),
+        project=_clean(request.project),
+        tags=_clean(request.tags),
+        status=_clean(request.status) or "Active",
+        importance=_clean(request.importance) or "Medium",
+        source_type=_clean(request.source_type) or "text",
+        capture_source=_clean(request.capture_source) or "manual",
+        created_at=None,
+        updated_at=None,
+    )
+
+
+@router.post(
+    "/decisions/create-preview",
+    response_model=DecisionCreatePreviewResponse,
+)
+def preview_decision_create(request: DecisionCreatePreviewRequest):
+    from app.repositories.sheets_decision_repository import SheetsDecisionRepository
+
+    repo = SheetsDecisionRepository()
+    inspection = repo.inspect_schema()
+    preview_decision = _preview_item(request)
+
+    if not inspection["exists"] or inspection["headers_match"] is not True:
+        warnings = list(inspection["warnings"])
+        warnings.append("Decisions schema must exist with approved headers before decisions can be created.")
+        return DecisionCreatePreviewResponse(
+            dry_run=True,
+            would_create_decision=False,
+            schema_ok=False,
+            duplicate_candidates=[],
+            decision=preview_decision,
+            warnings=warnings,
+        )
+
+    duplicate_candidates = repo.find_duplicate_candidates(
+        preview_decision.decision,
+        preview_decision.project,
+    )
+    warnings = []
+
+    if duplicate_candidates:
+        warnings.append("Possible duplicate decision found. Preview only; no decision was created.")
+
+    return DecisionCreatePreviewResponse(
+        dry_run=True,
+        would_create_decision=True,
+        schema_ok=True,
+        duplicate_candidates=duplicate_candidates,
+        decision=preview_decision,
+        warnings=warnings,
     )
