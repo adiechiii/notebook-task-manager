@@ -7,6 +7,9 @@ from app.schemas.thought_schema import (
     THOUGHTS_HEADERS,
     THOUGHTS_SCHEMA_PREVIEW_WARNINGS,
     THOUGHTS_WORKSHEET_NAME,
+    ThoughtCreatePreviewRequest,
+    ThoughtCreatePreviewResponse,
+    ThoughtPreviewItem,
     ThoughtSchemaSetupRequest,
     ThoughtSchemaSetupResponse,
     ThoughtSchemaPreviewResponse,
@@ -95,4 +98,82 @@ def setup_thoughts_schema(request: ThoughtSchemaSetupRequest):
         inspection=result,
         creates_worksheet=creates_worksheet,
         created_worksheet=result["created_worksheet"],
+    )
+
+
+def _clean(value: str) -> str:
+    return str(value or "").strip()
+
+
+def _preview_item(request: ThoughtCreatePreviewRequest) -> ThoughtPreviewItem:
+    raw_thought = _clean(request.raw_thought)
+    summary = _clean(request.summary) or raw_thought
+
+    return ThoughtPreviewItem(
+        thought_id=None,
+        raw_thought=raw_thought,
+        summary=summary,
+        thought_type=_clean(request.thought_type) or "Reflection",
+        mood=_clean(request.mood),
+        energy=_clean(request.energy),
+        project=_clean(request.project),
+        tags=_clean(request.tags),
+        status=_clean(request.status) or "Active",
+        source_type=_clean(request.source_type) or "text",
+        created_at=None,
+        updated_at=None,
+    )
+
+
+@router.post(
+    "/thoughts/create-preview",
+    response_model=ThoughtCreatePreviewResponse,
+)
+def preview_thought_create(request: ThoughtCreatePreviewRequest):
+    from app.repositories.sheets_thought_repository import SheetsThoughtRepository
+
+    repo = SheetsThoughtRepository()
+    inspection = repo.inspect_schema()
+    preview_thought = _preview_item(request)
+
+    if not inspection["exists"] or inspection["headers_match"] is not True:
+        warnings = list(inspection["warnings"])
+        warnings.append("Thoughts schema must exist with approved headers before thoughts can be created.")
+        return ThoughtCreatePreviewResponse(
+            dry_run=True,
+            would_create_thought=False,
+            schema_ok=False,
+            duplicate_candidates=[],
+            thought=preview_thought,
+            warnings=warnings,
+        )
+
+    if not preview_thought.raw_thought:
+        return ThoughtCreatePreviewResponse(
+            dry_run=True,
+            would_create_thought=False,
+            schema_ok=True,
+            duplicate_candidates=[],
+            thought=preview_thought,
+            warnings=[
+                "Raw thought is required. Preview only; no thought was created.",
+            ],
+        )
+
+    duplicate_candidates = repo.find_duplicate_candidates(
+        preview_thought.raw_thought,
+        preview_thought.project,
+    )
+    warnings = []
+
+    if duplicate_candidates:
+        warnings.append("Possible duplicate thought found. Preview only; no thought was created.")
+
+    return ThoughtCreatePreviewResponse(
+        dry_run=True,
+        would_create_thought=True,
+        schema_ok=True,
+        duplicate_candidates=duplicate_candidates,
+        thought=preview_thought,
+        warnings=warnings,
     )

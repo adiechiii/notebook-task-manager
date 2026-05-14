@@ -79,3 +79,50 @@ class SheetsThoughtRepository:
             "warnings": [],
             "created_worksheet": True,
         }
+
+    def _worksheet(self):
+        return self.workbook.worksheet(THOUGHTS_WORKSHEET_NAME)
+
+    def read_thoughts(self):
+        return self._worksheet().get_all_records()
+
+    def find_duplicate_candidates(self, raw_thought: str, project: str = ""):
+        wanted_raw_thought = _normalized_key(raw_thought)
+        wanted_project = _normalized_key(project)
+        candidates = []
+
+        if not wanted_raw_thought:
+            return candidates
+
+        for row in self.read_thoughts():
+            row_raw_thought = _normalized_key(row.get("Raw Thought"))
+            row_project = _normalized_key(row.get("Project"))
+
+            if row_raw_thought != wanted_raw_thought:
+                continue
+
+            if row_project == wanted_project or not row_project or not wanted_project:
+                candidates.append(_thought_from_row(row))
+
+        return candidates
+
+
+def _normalized_key(value):
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _thought_from_row(row):
+    return {
+        "thought_id": row.get("Thought ID"),
+        "raw_thought": row.get("Raw Thought") or "",
+        "summary": row.get("Summary") or "",
+        "thought_type": row.get("Thought Type") or "",
+        "mood": row.get("Mood") or "",
+        "energy": row.get("Energy") or "",
+        "project": row.get("Project") or "",
+        "tags": row.get("Tags") or "",
+        "status": row.get("Status") or "",
+        "source_type": row.get("Source Type") or "",
+        "created_at": row.get("Created At") or None,
+        "updated_at": row.get("Updated At") or None,
+    }

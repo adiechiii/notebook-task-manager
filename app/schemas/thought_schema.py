@@ -57,3 +57,39 @@ class ThoughtSchemaSetupResponse(BaseModel):
     expected_headers: list[str]
     existing_headers: list[str]
     warnings: list[str]
+
+
+class ThoughtCreatePreviewRequest(BaseModel):
+    raw_thought: str
+    summary: str = ""
+    thought_type: str = ""
+    mood: str = ""
+    energy: str = ""
+    project: str = ""
+    tags: str = ""
+    status: str = ""
+    source_type: str = ""
+
+
+class ThoughtPreviewItem(BaseModel):
+    thought_id: str | None = None
+    raw_thought: str
+    summary: str
+    thought_type: str
+    mood: str
+    energy: str
+    project: str
+    tags: str
+    status: str
+    source_type: str
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class ThoughtCreatePreviewResponse(BaseModel):
+    dry_run: bool
+    would_create_thought: bool
+    schema_ok: bool
+    duplicate_candidates: list[ThoughtPreviewItem]
+    thought: ThoughtPreviewItem
+    warnings: list[str]
