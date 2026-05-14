@@ -106,3 +106,14 @@ class ThoughtCreateResponse(BaseModel):
     duplicate_candidates: list[ThoughtPreviewItem]
     thought: ThoughtPreviewItem
     warnings: list[str]
+
+
+class ThoughtSearchResponse(BaseModel):
+    query: str
+    status: str
+    project: str
+    thought_type: str
+    limit: int
+    count: int
+    thoughts: list[ThoughtPreviewItem]
+    warnings: list[str]

@@ -140,9 +140,87 @@ class SheetsThoughtRepository:
             "warnings": [],
         }
 
+    def search_thoughts(
+        self,
+        query: str = "",
+        status: str = "",
+        project: str = "",
+        thought_type: str = "",
+        limit: int = 50,
+    ):
+        inspection = self.inspect_schema()
+
+        if not inspection["exists"] or inspection["headers_match"] is not True:
+            return {
+                "schema_ok": False,
+                "thoughts": [],
+                "warnings": inspection["warnings"],
+            }
+
+        normalized_query = _normalized_key(query)
+        normalized_status = _normalized_key(status)
+        normalized_project = _normalized_key(project)
+        normalized_thought_type = _normalized_key(thought_type)
+        safe_limit = _clamp_limit(limit)
+        thoughts = []
+
+        for row in self.read_thoughts():
+            thought = _thought_from_row(row)
+
+            if normalized_status and _normalized_key(thought["status"]) != normalized_status:
+                continue
+
+            if normalized_project and _normalized_key(thought["project"]) != normalized_project:
+                continue
+
+            if normalized_thought_type and _normalized_key(thought["thought_type"]) != normalized_thought_type:
+                continue
+
+            if normalized_query and normalized_query not in _searchable_thought_text(thought):
+                continue
+
+            thoughts.append(thought)
+
+        thoughts.sort(
+            key=lambda thought: thought.get("created_at") or thought.get("updated_at") or "",
+            reverse=True,
+        )
+
+        return {
+            "schema_ok": True,
+            "thoughts": thoughts[:safe_limit],
+            "warnings": [],
+        }
+
 
 def _normalized_key(value):
     return " ".join(str(value or "").strip().lower().split())
+
+
+def _clamp_limit(value):
+    try:
+        limit = int(value)
+    except (TypeError, ValueError):
+        limit = 50
+
+    return min(max(limit, 1), 100)
+
+
+def _searchable_thought_text(thought):
+    return _normalized_key(
+        " ".join(
+            [
+                thought.get("raw_thought", ""),
+                thought.get("summary", ""),
+                thought.get("thought_type", ""),
+                thought.get("mood", ""),
+                thought.get("energy", ""),
+                thought.get("project", ""),
+                thought.get("tags", ""),
+                thought.get("status", ""),
+            ]
+        )
+    )
 
 
 def _thought_from_row(row):

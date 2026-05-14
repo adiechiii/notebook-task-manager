@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from app.schemas.thought_schema import (
@@ -16,6 +16,7 @@ from app.schemas.thought_schema import (
     ThoughtCreatePreviewRequest,
     ThoughtCreatePreviewResponse,
     ThoughtPreviewItem,
+    ThoughtSearchResponse,
     ThoughtSchemaSetupRequest,
     ThoughtSchemaSetupResponse,
     ThoughtSchemaPreviewResponse,
@@ -278,4 +279,39 @@ def create_thought(request: ThoughtCreateRequest):
         duplicate_candidates=duplicate_candidates,
         thought=result["thought"],
         warnings=warnings,
+    )
+
+
+@router.get(
+    "/thoughts/search",
+    response_model=ThoughtSearchResponse,
+)
+def search_thoughts(
+    query: str = Query(default=""),
+    status: str = Query(default=""),
+    project: str = Query(default=""),
+    thought_type: str = Query(default=""),
+    limit: int = Query(default=50),
+):
+    from app.repositories.sheets_thought_repository import SheetsThoughtRepository
+
+    repo = SheetsThoughtRepository()
+    result = repo.search_thoughts(
+        query=query,
+        status=status,
+        project=project,
+        thought_type=thought_type,
+        limit=limit,
+    )
+    safe_limit = min(max(int(limit or 50), 1), 100)
+
+    return ThoughtSearchResponse(
+        query=query,
+        status=status,
+        project=project,
+        thought_type=thought_type,
+        limit=safe_limit,
+        count=len(result["thoughts"]),
+        thoughts=result["thoughts"],
+        warnings=result["warnings"],
     )
