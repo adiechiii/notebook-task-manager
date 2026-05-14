@@ -40,3 +40,20 @@ class ThoughtSchemaPreviewResponse(BaseModel):
     headers: list[str]
     suggested_thought_types: list[str]
     warnings: list[str]
+
+
+class ThoughtSchemaSetupRequest(BaseModel):
+    dry_run: bool = True
+    confirmation: str = ""
+
+
+class ThoughtSchemaSetupResponse(BaseModel):
+    dry_run: bool
+    worksheet_name: str
+    exists: bool
+    creates_worksheet: bool
+    created_worksheet: bool
+    headers_match: bool | None
+    expected_headers: list[str]
+    existing_headers: list[str]
+    warnings: list[str]
