@@ -103,3 +103,14 @@ class DecisionCreateResponse(BaseModel):
     duplicate_candidates: list[DecisionPreviewItem]
     decision: DecisionPreviewItem
     warnings: list[str]
+
+
+class DecisionSearchResponse(BaseModel):
+    query: str
+    status: str
+    project: str
+    importance: str
+    limit: int
+    count: int
+    decisions: list[DecisionPreviewItem]
+    warnings: list[str]

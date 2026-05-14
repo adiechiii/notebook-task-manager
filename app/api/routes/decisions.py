@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from app.schemas.decision_schema import (
@@ -15,6 +15,7 @@ from app.schemas.decision_schema import (
     DecisionCreatePreviewRequest,
     DecisionCreatePreviewResponse,
     DecisionPreviewItem,
+    DecisionSearchResponse,
     DecisionSchemaSetupRequest,
     DecisionSchemaSetupResponse,
     DecisionSchemaPreviewResponse,
@@ -247,4 +248,39 @@ def create_decision(request: DecisionCreateRequest):
         duplicate_candidates=duplicate_candidates,
         decision=result["decision"],
         warnings=warnings,
+    )
+
+
+@router.get(
+    "/decisions/search",
+    response_model=DecisionSearchResponse,
+)
+def search_decisions(
+    query: str = Query(default=""),
+    status: str = Query(default=""),
+    project: str = Query(default=""),
+    importance: str = Query(default=""),
+    limit: int = Query(default=50),
+):
+    from app.repositories.sheets_decision_repository import SheetsDecisionRepository
+
+    repo = SheetsDecisionRepository()
+    result = repo.search_decisions(
+        query=query,
+        status=status,
+        project=project,
+        importance=importance,
+        limit=limit,
+    )
+    safe_limit = min(max(int(limit or 50), 1), 100)
+
+    return DecisionSearchResponse(
+        query=query,
+        status=status,
+        project=project,
+        importance=importance,
+        limit=safe_limit,
+        count=len(result["decisions"]),
+        decisions=result["decisions"],
+        warnings=result["warnings"],
     )

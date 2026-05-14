@@ -142,9 +142,88 @@ class SheetsDecisionRepository:
             "warnings": [],
         }
 
+    def search_decisions(
+        self,
+        query: str = "",
+        status: str = "",
+        project: str = "",
+        importance: str = "",
+        limit: int = 50,
+    ):
+        inspection = self.inspect_schema()
+
+        if not inspection["exists"] or inspection["headers_match"] is not True:
+            return {
+                "schema_ok": False,
+                "decisions": [],
+                "warnings": inspection["warnings"],
+            }
+
+        normalized_query = _normalized_key(query)
+        normalized_status = _normalized_key(status)
+        normalized_project = _normalized_key(project)
+        normalized_importance = _normalized_key(importance)
+        safe_limit = _clamp_limit(limit)
+        decisions = []
+
+        for row in self.read_decisions():
+            decision = _decision_from_row(row)
+
+            if normalized_status and _normalized_key(decision["status"]) != normalized_status:
+                continue
+
+            if normalized_project and _normalized_key(decision["project"]) != normalized_project:
+                continue
+
+            if normalized_importance and _normalized_key(decision["importance"]) != normalized_importance:
+                continue
+
+            if normalized_query and normalized_query not in _searchable_decision_text(decision):
+                continue
+
+            decisions.append(decision)
+
+        decisions.sort(
+            key=lambda decision: decision.get("created_at") or decision.get("updated_at") or "",
+            reverse=True,
+        )
+
+        return {
+            "schema_ok": True,
+            "decisions": decisions[:safe_limit],
+            "warnings": [],
+        }
+
 
 def _normalized_key(value):
     return " ".join(str(value or "").strip().lower().split())
+
+
+def _clamp_limit(value):
+    try:
+        limit = int(value)
+    except (TypeError, ValueError):
+        limit = 50
+
+    return min(max(limit, 1), 100)
+
+
+def _searchable_decision_text(decision):
+    return _normalized_key(
+        " ".join(
+            [
+                decision.get("decision", ""),
+                decision.get("context", ""),
+                decision.get("rationale", ""),
+                decision.get("outcome", ""),
+                decision.get("tradeoffs", ""),
+                decision.get("project", ""),
+                decision.get("tags", ""),
+                decision.get("status", ""),
+                decision.get("importance", ""),
+            ]
+        )
+    )
 
 
 def _decision_from_row(row):
