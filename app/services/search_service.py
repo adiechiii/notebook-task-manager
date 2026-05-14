@@ -1,6 +1,7 @@
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.repositories.sheets_memory_repository import SheetsMemoryRepository
 from app.repositories.sheets_project_repository import SheetsProjectRepository
+from app.repositories.sheets_decision_repository import SheetsDecisionRepository
 
 
 def _normalize_query(query: str) -> str:
@@ -49,15 +50,28 @@ def _project_result(project: dict) -> dict:
     }
 
 
+def _decision_result(decision: dict) -> dict:
+    title = decision.get("decision") or ""
+
+    return {
+        "type": "decision",
+        "title": title,
+        "text": title,
+        "data": decision,
+    }
+
+
 def build_search_everything(
     query: str = "",
     task_repo=None,
     memory_repo=None,
     project_repo=None,
+    decision_repo=None,
 ):
     task_repo = task_repo or SheetsTaskRepository()
     memory_repo = memory_repo or SheetsMemoryRepository()
     project_repo = project_repo or SheetsProjectRepository()
+    decision_repo = decision_repo or SheetsDecisionRepository()
 
     raw_query = str(query or "")
     normalized_query = _normalize_query(raw_query)
@@ -76,11 +90,20 @@ def build_search_everything(
     memories = memory_repo.search_memories(raw_query)
     projects = project_repo.search_projects(raw_query)
 
+    try:
+        decision_search = decision_repo.search_decisions(raw_query, limit=50)
+        decisions = decision_search.get("decisions", [])
+        decision_warnings = decision_search.get("warnings", [])
+    except Exception:
+        decisions = []
+        decision_warnings = ["Decision search failed; returning other search results."]
+
     task_results = [_task_result(task) for task in tasks]
     memory_results = [_memory_result(memory) for memory in memories]
     project_results = [_project_result(project) for project in projects]
+    decision_results = [_decision_result(decision) for decision in decisions]
 
-    results = task_results + memory_results + project_results
+    results = task_results + memory_results + project_results + decision_results
 
     return {
         "query": raw_query,
@@ -96,6 +119,11 @@ def build_search_everything(
         "projects": {
             "count": len(project_results),
             "results": project_results,
+        },
+        "decisions": {
+            "count": len(decision_results),
+            "results": decision_results,
+            "warnings": decision_warnings,
         },
         "results": results,
     }
