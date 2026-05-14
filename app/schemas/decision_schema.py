@@ -33,3 +33,20 @@ class DecisionSchemaPreviewResponse(BaseModel):
     required_confirmation: str
     headers: list[str]
     warnings: list[str]
+
+
+class DecisionSchemaSetupRequest(BaseModel):
+    dry_run: bool = True
+    confirmation: str = ""
+
+
+class DecisionSchemaSetupResponse(BaseModel):
+    dry_run: bool
+    worksheet_name: str
+    exists: bool
+    creates_worksheet: bool
+    created_worksheet: bool
+    headers_match: bool | None
+    expected_headers: list[str]
+    existing_headers: list[str]
+    warnings: list[str]
