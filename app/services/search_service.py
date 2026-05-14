@@ -2,6 +2,7 @@ from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.repositories.sheets_memory_repository import SheetsMemoryRepository
 from app.repositories.sheets_project_repository import SheetsProjectRepository
 from app.repositories.sheets_decision_repository import SheetsDecisionRepository
+from app.repositories.sheets_thought_repository import SheetsThoughtRepository
 
 
 def _normalize_query(query: str) -> str:
@@ -61,17 +62,30 @@ def _decision_result(decision: dict) -> dict:
     }
 
 
+def _thought_result(thought: dict) -> dict:
+    title = thought.get("summary") or thought.get("raw_thought") or ""
+
+    return {
+        "type": "thought",
+        "title": title,
+        "text": thought.get("raw_thought", ""),
+        "data": thought,
+    }
+
+
 def build_search_everything(
     query: str = "",
     task_repo=None,
     memory_repo=None,
     project_repo=None,
     decision_repo=None,
+    thought_repo=None,
 ):
     task_repo = task_repo or SheetsTaskRepository()
     memory_repo = memory_repo or SheetsMemoryRepository()
     project_repo = project_repo or SheetsProjectRepository()
     decision_repo = decision_repo or SheetsDecisionRepository()
+    thought_repo = thought_repo or SheetsThoughtRepository()
 
     raw_query = str(query or "")
     normalized_query = _normalize_query(raw_query)
@@ -98,12 +112,21 @@ def build_search_everything(
         decisions = []
         decision_warnings = ["Decision search failed; returning other search results."]
 
+    try:
+        thought_search = thought_repo.search_thoughts(raw_query, limit=50)
+        thoughts = thought_search.get("thoughts", [])
+        thought_warnings = thought_search.get("warnings", [])
+    except Exception:
+        thoughts = []
+        thought_warnings = ["Thought search failed; returning other search results."]
+
     task_results = [_task_result(task) for task in tasks]
     memory_results = [_memory_result(memory) for memory in memories]
     project_results = [_project_result(project) for project in projects]
     decision_results = [_decision_result(decision) for decision in decisions]
+    thought_results = [_thought_result(thought) for thought in thoughts]
 
-    results = task_results + memory_results + project_results + decision_results
+    results = task_results + memory_results + project_results + decision_results + thought_results
 
     return {
         "query": raw_query,
@@ -124,6 +147,11 @@ def build_search_everything(
             "count": len(decision_results),
             "results": decision_results,
             "warnings": decision_warnings,
+        },
+        "thoughts": {
+            "count": len(thought_results),
+            "results": thought_results,
+            "warnings": thought_warnings,
         },
         "results": results,
     }
