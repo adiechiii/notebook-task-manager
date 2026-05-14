@@ -106,6 +106,42 @@ class SheetsDecisionRepository:
 
         return candidates
 
+    def create_decision(self, decision: dict):
+        inspection = self.inspect_schema()
+
+        if not inspection["exists"] or inspection["headers_match"] is not True:
+            return {
+                "created": False,
+                "schema_ok": False,
+                "decision": decision,
+                "warnings": inspection["warnings"],
+            }
+
+        row = [
+            decision["decision_id"],
+            decision["decision"],
+            decision["context"],
+            decision["rationale"],
+            decision["outcome"],
+            decision["tradeoffs"],
+            decision["project"],
+            decision["tags"],
+            decision["status"],
+            decision["importance"],
+            decision["source_type"],
+            decision["capture_source"],
+            decision["created_at"],
+            decision["updated_at"],
+        ]
+        self._worksheet().append_row(row)
+
+        return {
+            "created": True,
+            "schema_ok": True,
+            "decision": decision,
+            "warnings": [],
+        }
+
 
 def _normalized_key(value):
     return " ".join(str(value or "").strip().lower().split())

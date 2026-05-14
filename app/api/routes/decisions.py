@@ -1,11 +1,17 @@
+import uuid
+from datetime import datetime
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.schemas.decision_schema import (
+    CREATE_DECISION_CONFIRMATION,
     CREATE_DECISIONS_WORKSHEET_CONFIRMATION,
     DECISIONS_HEADERS,
     DECISIONS_SCHEMA_PREVIEW_WARNINGS,
     DECISIONS_WORKSHEET_NAME,
+    DecisionCreateRequest,
+    DecisionCreateResponse,
     DecisionCreatePreviewRequest,
     DecisionCreatePreviewResponse,
     DecisionPreviewItem,
@@ -122,6 +128,26 @@ def _preview_item(request: DecisionCreatePreviewRequest) -> DecisionPreviewItem:
     )
 
 
+def _created_item(request: DecisionCreateRequest) -> DecisionPreviewItem:
+    now = datetime.utcnow().isoformat()
+    return DecisionPreviewItem(
+        decision_id=str(uuid.uuid4()),
+        decision=_clean(request.decision),
+        context=_clean(request.context),
+        rationale=_clean(request.rationale),
+        outcome=_clean(request.outcome),
+        tradeoffs=_clean(request.tradeoffs),
+        project=_clean(request.project),
+        tags=_clean(request.tags),
+        status=_clean(request.status) or "Active",
+        importance=_clean(request.importance) or "Medium",
+        source_type=_clean(request.source_type) or "text",
+        capture_source=_clean(request.capture_source) or "manual",
+        created_at=now,
+        updated_at=now,
+    )
+
+
 @router.post(
     "/decisions/create-preview",
     response_model=DecisionCreatePreviewResponse,
@@ -160,5 +186,65 @@ def preview_decision_create(request: DecisionCreatePreviewRequest):
         schema_ok=True,
         duplicate_candidates=duplicate_candidates,
         decision=preview_decision,
+        warnings=warnings,
+    )
+
+
+@router.post(
+    "/decisions/create",
+    response_model=DecisionCreateResponse,
+)
+def create_decision(request: DecisionCreateRequest):
+    if request.confirmation != CREATE_DECISION_CONFIRMATION:
+        return JSONResponse(
+            status_code=400,
+            content=DecisionCreateResponse(
+                created=False,
+                schema_ok=False,
+                duplicate_candidates=[],
+                decision=_preview_item(request),
+                warnings=[
+                    "Exact confirmation phrase is required. No decision was created.",
+                ],
+            ).model_dump(),
+        )
+
+    from app.repositories.sheets_decision_repository import SheetsDecisionRepository
+
+    repo = SheetsDecisionRepository()
+    inspection = repo.inspect_schema()
+    decision = _created_item(request)
+
+    if not inspection["exists"] or inspection["headers_match"] is not True:
+        warnings = list(inspection["warnings"])
+        warnings.append("Decisions schema must exist with approved headers before decisions can be created.")
+        return JSONResponse(
+            status_code=400,
+            content=DecisionCreateResponse(
+                created=False,
+                schema_ok=False,
+                duplicate_candidates=[],
+                decision=decision,
+                warnings=warnings,
+            ).model_dump(),
+        )
+
+    duplicate_candidates = repo.find_duplicate_candidates(
+        decision.decision,
+        decision.project,
+    )
+    warnings = []
+
+    if duplicate_candidates:
+        warnings.append("Possible duplicate decision found. Decision was created anyway.")
+
+    result = repo.create_decision(decision.model_dump())
+    warnings.extend(result["warnings"])
+
+    return DecisionCreateResponse(
+        created=result["created"],
+        schema_ok=result["schema_ok"],
+        duplicate_candidates=duplicate_candidates,
+        decision=result["decision"],
         warnings=warnings,
     )

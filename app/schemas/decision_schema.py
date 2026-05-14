@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 DECISIONS_WORKSHEET_NAME = "Decisions"
 CREATE_DECISIONS_WORKSHEET_CONFIRMATION = "CREATE DECISIONS WORKSHEET"
+CREATE_DECISION_CONFIRMATION = "CREATE DECISION"
 DECISIONS_HEADERS = [
     "Decision ID",
     "Decision",
@@ -86,6 +87,18 @@ class DecisionPreviewItem(BaseModel):
 class DecisionCreatePreviewResponse(BaseModel):
     dry_run: bool
     would_create_decision: bool
+    schema_ok: bool
+    duplicate_candidates: list[DecisionPreviewItem]
+    decision: DecisionPreviewItem
+    warnings: list[str]
+
+
+class DecisionCreateRequest(DecisionCreatePreviewRequest):
+    confirmation: str
+
+
+class DecisionCreateResponse(BaseModel):
+    created: bool
     schema_ok: bool
     duplicate_candidates: list[DecisionPreviewItem]
     decision: DecisionPreviewItem
