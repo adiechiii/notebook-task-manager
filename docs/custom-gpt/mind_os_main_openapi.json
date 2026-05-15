@@ -1,0 +1,929 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Notebook Task Manager API",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "https://notebook-task-manager.onrender.com"
+        }
+    ],
+    "paths": {
+        "/health": {
+            "get": {
+                "operationId": "getHealth",
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "API health status"
+                    }
+                }
+            }
+        },
+        "/search/everything": {
+            "get": {
+                "operationId": "searchEverything",
+                "summary": "Search tasks, memories, projects, and decisions",
+                "description": "Combined read-only search across tasks, memories, projects, and decisions. Decision results appear in the top-level decisions block and merged results as type decision.",
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Combined search results"
+                    }
+                }
+            }
+        },
+        "/brief/morning": {
+            "get": {
+                "operationId": "getMorningBrief",
+                "summary": "Get morning brief",
+                "description": "Use this for morning brief, start my day, daily start, what should I focus on first, or start-of-day Mind OS briefing.",
+                "responses": {
+                    "200": {
+                        "description": "Morning brief with focus, counts, top priorities, overdue tasks, today tasks, project rollups, suggested first action, and warnings."
+                    }
+                }
+            }
+        },
+        "/focus/mode": {
+            "get": {
+                "operationId": "getFocusMode",
+                "summary": "Get focus mode",
+                "description": "Use this for focus mode, what should I do now, top 3 tasks, give me only 3 things, what should I focus on, or immediate priority focus.",
+                "responses": {
+                    "200": {
+                        "description": "Focus mode with the top 3 active tasks, counts, ignored task counts, and warnings."
+                    }
+                }
+            }
+        },
+        "/tasks/command-center": {
+            "get": {
+                "operationId": "getCommandCenter",
+                "summary": "Get command center task buckets",
+                "description": "Use this for command center, today's tasks, overdue tasks, no-date tasks, or what needs attention.",
+                "responses": {
+                    "200": {
+                        "description": "Command center task buckets"
+                    }
+                }
+            }
+        },
+        "/review/night": {
+            "get": {
+                "operationId": "getNightReview",
+                "summary": "Get night review",
+                "description": "Use this for night review, close my day, end of day review, evening review, or end-of-day Mind OS reflection.",
+                "responses": {
+                    "200": {
+                        "description": "Night review with completed tasks, remaining tasks, archived/done summary, memories captured today, project progress, tomorrow carryover, status changes today, and warnings."
+                    }
+                }
+            }
+        },
+        "/review/weekly": {
+            "get": {
+                "operationId": "getWeeklyReview",
+                "summary": "Get weekly review",
+                "description": "Use this for weekly review or review my week.",
+                "responses": {
+                    "200": {
+                        "description": "Weekly review"
+                    }
+                }
+            }
+        },
+        "/tasks": {
+            "get": {
+                "operationId": "listTasks",
+                "summary": "Get tasks",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Pending",
+                                "Done"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of tasks"
+                    }
+                }
+            }
+        },
+        "/ingest/preview": {
+            "get": {
+                "operationId": "getTaskPreview",
+                "summary": "Preview parsed tasks before saving",
+                "description": "Use this to review, preview, inspect, parse, or check one or more tasks before saving. Send all tasks as one newline-separated string in the text query parameter. This is read-only and does not save tasks.",
+                "parameters": [
+                    {
+                        "name": "text",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "One or more tasks as a single newline-separated string."
+                    },
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        },
+                        "description": "Optional project name to link these tasks to."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Parsed task preview. Read-only. Does not save tasks."
+                    }
+                }
+            }
+        },
+        "/ingest/confirm": {
+            "post": {
+                "operationId": "confirmTasks",
+                "summary": "Save confirmed tasks",
+                "description": "Use only after user approves reviewed tasks. Send all tasks as one newline-separated string, never an array.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/IngestRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tasks saved"
+                    }
+                }
+            }
+        },
+        "/tasks/update": {
+            "post": {
+                "operationId": "updateTaskStatus",
+                "summary": "Update task status",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TaskUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Task updated"
+                    }
+                }
+            }
+        },
+        "/tasks/delete": {
+            "post": {
+                "operationId": "deleteTask",
+                "summary": "Delete task",
+                "description": "Destructive. Use carefully only when explicitly requested by the user.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TextOnlyRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Task deleted"
+                    }
+                }
+            }
+        },
+        "/tasks/archive-preview": {
+            "get": {
+                "operationId": "getArchivePreview",
+                "summary": "Preview completed tasks that can be archived",
+                "description": "Dry-run only. Does not change data.",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "Done"
+                        }
+                    },
+                    {
+                        "name": "older_than_days",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 0
+                        }
+                    },
+                    {
+                        "name": "include_done",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Archive preview"
+                    }
+                }
+            }
+        },
+        "/tasks/duplicates-preview": {
+            "get": {
+                "operationId": "getDuplicateTasksPreview",
+                "summary": "Preview duplicate tasks",
+                "description": "Use this to find likely duplicate active tasks. This is dry-run only and does not delete, archive, update, or save anything.",
+                "responses": {
+                    "200": {
+                        "description": "Dry-run duplicate task preview with duplicate groups, candidate tasks, summary counts, and warnings."
+                    }
+                }
+            }
+        },
+        "/tasks/duplicates-plan": {
+            "get": {
+                "operationId": "getDuplicateTasksPlan",
+                "summary": "Get duplicate cleanup plan",
+                "description": "Use this to create a dry-run duplicate cleanup plan. It suggests which duplicate task to keep and which tasks could be archived, but does not change, delete, archive, or update anything.",
+                "responses": {
+                    "200": {
+                        "description": "Dry-run duplicate cleanup plan with suggested keep task, suggested archive candidates, confidence, reasons, summary counts, and warnings."
+                    }
+                }
+            }
+        },
+        "/memory/create": {
+            "post": {
+                "operationId": "createMemory",
+                "summary": "Save a memory or note",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemoryCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Memory saved"
+                    }
+                }
+            }
+        },
+        "/memory/search": {
+            "get": {
+                "operationId": "searchMemories",
+                "summary": "Search saved memories",
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Matching memories"
+                    }
+                }
+            }
+        },
+        "/projects/create": {
+            "post": {
+                "operationId": "createProject",
+                "summary": "Create a project",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProjectCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Project created"
+                    }
+                }
+            }
+        },
+        "/projects/search": {
+            "get": {
+                "operationId": "searchProjects",
+                "summary": "Search projects",
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Matching projects"
+                    }
+                }
+            }
+        },
+        "/projects/dashboard": {
+            "get": {
+                "operationId": "getProjectDashboard",
+                "summary": "Get project dashboard",
+                "description": "Use this for a specific project dashboard, project summary, project status, project next actions, or project-linked tasks and memories.",
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Project name or search query, for example AI Trading Assistant."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Project dashboard with matched project, linked tasks, linked memories, task counts, overdue/today/no-date tasks, recent memories, next actions, and metadata."
+                    }
+                }
+            }
+        },
+        "/decisions/create-preview": {
+            "post": {
+                "summary": "Preview Decision Create",
+                "operationId": "preview_decision_create_decisions_create_preview_post",
+                "description": "Preview a decision row before saving. Read-only. Does not append a row.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DecisionCreatePreviewRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Decision create preview result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DecisionCreatePreviewResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/decisions/create": {
+            "post": {
+                "summary": "Create Decision",
+                "operationId": "create_decision_decisions_create_post",
+                "description": "Append one decision row to the Decisions worksheet. Requires exact confirmation CREATE DECISION.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DecisionCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Decision create result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DecisionCreateResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/decisions/search": {
+            "get": {
+                "summary": "Search Decisions",
+                "operationId": "search_decisions_decisions_search_get",
+                "description": "Read-only search over the Decisions worksheet.",
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        }
+                    },
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        }
+                    },
+                    {
+                        "name": "importance",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Decision search results",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DecisionSearchResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "IngestRequest": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string"
+                    },
+                    "project": {
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "required": [
+                    "text"
+                ]
+            },
+            "MemoryCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string"
+                    },
+                    "project": {
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "required": [
+                    "text"
+                ]
+            },
+            "TextOnlyRequest": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "text"
+                ]
+            },
+            "TaskUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "Pending",
+                            "Done"
+                        ]
+                    }
+                },
+                "required": [
+                    "text",
+                    "status"
+                ]
+            },
+            "ProjectCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "goal": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "category": {
+                        "type": "string",
+                        "default": "General"
+                    },
+                    "priority": {
+                        "type": "string",
+                        "default": "Medium"
+                    },
+                    "tags": {
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "DecisionItem": {
+                "type": "object",
+                "properties": {
+                    "decision_id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "decision": {
+                        "type": "string"
+                    },
+                    "context": {
+                        "type": "string"
+                    },
+                    "rationale": {
+                        "type": "string"
+                    },
+                    "outcome": {
+                        "type": "string"
+                    },
+                    "tradeoffs": {
+                        "type": "string"
+                    },
+                    "project": {
+                        "type": "string"
+                    },
+                    "tags": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "importance": {
+                        "type": "string"
+                    },
+                    "source_type": {
+                        "type": "string"
+                    },
+                    "capture_source": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "updated_at": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "decision_id",
+                    "decision",
+                    "context",
+                    "rationale",
+                    "outcome",
+                    "tradeoffs",
+                    "project",
+                    "tags",
+                    "status",
+                    "importance",
+                    "source_type",
+                    "capture_source",
+                    "created_at",
+                    "updated_at"
+                ]
+            },
+            "DecisionCreatePreviewRequest": {
+                "type": "object",
+                "properties": {
+                    "decision": {
+                        "type": "string"
+                    },
+                    "context": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "rationale": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "outcome": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "tradeoffs": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "project": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "tags": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "status": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "importance": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "capture_source": {
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "required": [
+                    "decision"
+                ]
+            },
+            "DecisionCreatePreviewResponse": {
+                "type": "object",
+                "properties": {
+                    "dry_run": {
+                        "type": "boolean"
+                    },
+                    "would_create_decision": {
+                        "type": "boolean"
+                    },
+                    "schema_ok": {
+                        "type": "boolean"
+                    },
+                    "duplicate_candidates": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DecisionItem"
+                        }
+                    },
+                    "decision": {
+                        "$ref": "#/components/schemas/DecisionItem"
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "dry_run",
+                    "would_create_decision",
+                    "schema_ok",
+                    "duplicate_candidates",
+                    "decision",
+                    "warnings"
+                ]
+            },
+            "DecisionCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "decision": {
+                        "type": "string"
+                    },
+                    "context": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "rationale": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "outcome": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "tradeoffs": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "project": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "tags": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "status": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "importance": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "capture_source": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "confirmation": {
+                        "type": "string",
+                        "description": "Must exactly equal CREATE DECISION."
+                    }
+                },
+                "required": [
+                    "decision",
+                    "confirmation"
+                ]
+            },
+            "DecisionCreateResponse": {
+                "type": "object",
+                "properties": {
+                    "created": {
+                        "type": "boolean"
+                    },
+                    "schema_ok": {
+                        "type": "boolean"
+                    },
+                    "duplicate_candidates": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DecisionItem"
+                        }
+                    },
+                    "decision": {
+                        "$ref": "#/components/schemas/DecisionItem"
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "created",
+                    "schema_ok",
+                    "duplicate_candidates",
+                    "decision",
+                    "warnings"
+                ]
+            },
+            "DecisionSearchResponse": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "project": {
+                        "type": "string"
+                    },
+                    "importance": {
+                        "type": "string"
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "count": {
+                        "type": "integer"
+                    },
+                    "decisions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DecisionItem"
+                        }
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "query",
+                    "status",
+                    "project",
+                    "importance",
+                    "limit",
+                    "count",
+                    "decisions",
+                    "warnings"
+                ]
+            }
+        }
+    }
+}
