@@ -7,6 +7,8 @@ from app.repositories.sheets_project_repository import SheetsProjectRepository
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.services.command_center_service import build_command_center
 from app.services.project_rollup_service import build_project_rollups
+from app.services.priority_scoring_service import score_priority
+from app.services.related_memory_service import find_related_memories
 
 
 SEVERITY_RANK = {
@@ -161,6 +163,125 @@ def _high_decisions_without_active_task(decisions: list[dict[str, Any]], tasks: 
             missing.append(decision)
 
     return missing
+
+
+def _project_metadata(projects: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    metadata = {}
+
+    for project in projects or []:
+        project_key = _key(project.get("name"))
+        if not project_key:
+            continue
+
+        metadata[project_key] = {
+            "name": project.get("name"),
+            "status": project.get("status"),
+            "priority": project.get("priority"),
+            "category": project.get("category"),
+            "tags": project.get("tags"),
+        }
+
+    return metadata
+
+
+def _related_decisions_for_project(decisions: list[dict[str, Any]], project: str) -> list[dict[str, Any]]:
+    cleaned_project = _clean(project)
+    if not cleaned_project:
+        return []
+
+    return [
+        decision
+        for decision in decisions or []
+        if _project_matches(decision.get("project"), cleaned_project)
+    ]
+
+
+def _task_cognition_insights(
+    command_center: dict[str, list[dict[str, Any]]],
+    decisions: list[dict[str, Any]],
+    memories: list[dict[str, Any]],
+    projects: list[dict[str, Any]],
+    limit: int,
+) -> list[dict[str, Any]]:
+    metadata = _project_metadata(projects)
+    candidates = []
+
+    for bucket in ("overdue", "today", "no_date", "upcoming"):
+        for task in command_center.get(bucket, []):
+            task_project = _clean(task.get("project"))
+            task_text = " ".join(
+                [
+                    _clean(task.get("title")),
+                    _clean(task.get("text")),
+                ]
+            ).strip()
+            if not task_text:
+                continue
+
+            related_decisions = _related_decisions_for_project(decisions, task_project)
+            related_memories = find_related_memories(
+                text=task_text,
+                project=task_project,
+                memories=memories,
+                limit=3,
+            )
+            scoring = score_priority(
+                text=task_text,
+                manual_priority=task.get("priority") or "",
+                due_date=task.get("page_date") or "",
+                project=task_project,
+                project_metadata=metadata.get(_key(task_project), {}),
+                related_decisions=related_decisions,
+                related_memories=related_memories,
+                task_context={"bucket": bucket},
+            )
+            score = int(scoring.get("score", 0) or 0)
+
+            if score < 60 and not related_memories and not related_decisions:
+                continue
+
+            candidates.append(
+                {
+                    "task": task,
+                    "bucket": bucket,
+                    "score": score,
+                    "priority_band": scoring.get("priority_band"),
+                    "priority_scoring": scoring,
+                    "related_decisions": related_decisions[:3],
+                    "related_memories": related_memories,
+                }
+            )
+
+    candidates.sort(
+        key=lambda item: (
+            -int(item.get("score", 0) or 0),
+            _key((item.get("task") or {}).get("title") or (item.get("task") or {}).get("text")),
+        )
+    )
+
+    insights = []
+    for item in candidates[:limit]:
+        task = item["task"]
+        severity = "High" if item["score"] >= 85 else "Medium"
+        insights.append(
+            {
+                "type": "cognition_priority",
+                "severity": severity,
+                "title": "Cognition scoring found a high-context priority",
+                "description": item["priority_scoring"].get("scoring_reason"),
+                "evidence": {
+                    "task": _slim_task(task),
+                    "bucket": item["bucket"],
+                    "score": item["score"],
+                    "priority_band": item["priority_band"],
+                    "related_decisions": [_slim_decision(decision) for decision in item["related_decisions"]],
+                    "related_memories": item["related_memories"],
+                },
+                "recommended_action": "Review this task with its decision and memory context before choosing next actions.",
+            }
+        )
+
+    return insights
 
 
 def _project_risk_level(rollup: dict[str, Any]) -> str:
@@ -532,6 +653,13 @@ def build_insights(
     decision_insights = _decision_insights(decisions, scoped_tasks)
     memory_insights = _memory_insights(scoped_memories, project_rollups)
     linkage_insights = _linkage_insights(project_rollups)
+    cognition_insights = _task_cognition_insights(
+        command_center,
+        decisions,
+        scoped_memories,
+        scoped_projects,
+        safe_limit,
+    )
 
     insights = _sort_insights(
         task_insights
@@ -539,6 +667,7 @@ def build_insights(
         + decision_insights
         + memory_insights
         + linkage_insights
+        + cognition_insights
     )
     limited_insights = insights[:safe_limit]
     opportunities = _opportunities(command_center, project_rollups, decisions, safe_limit)
@@ -563,7 +692,7 @@ def build_insights(
         "patterns": [
             item
             for item in limited_insights
-            if item.get("type") in {"overdue_patterns", "no_date_backlog", "unlinked_context"}
+            if item.get("type") in {"overdue_patterns", "no_date_backlog", "unlinked_context", "cognition_priority"}
         ],
         "risks": [
             item
@@ -583,6 +712,11 @@ def build_insights(
                 _slim_decision(decision)
                 for decision in _high_importance_decisions(decisions)
             ][:safe_limit],
+            "cognition_priorities": [
+                item
+                for item in limited_insights
+                if item.get("type") == "cognition_priority"
+            ],
         },
         "signals_used": [
             "task_pressure",
@@ -594,6 +728,8 @@ def build_insights(
             "no_date_backlog",
             "strategic_followup",
             "execution_focus",
+            "cognition_priority",
+            "related_memory_relevance",
         ],
         "future_signals": [
             "dependency_chains",
