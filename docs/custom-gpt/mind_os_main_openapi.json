@@ -552,6 +552,38 @@
                     }
                 }
             }
+        },
+        "/capture/confirm": {
+            "post": {
+                "operationId": "confirmCapture",
+                "summary": "Confirm unified capture",
+                "description": "Saves a previously reviewed unified capture after exact confirmation. Requires confirmation to equal CONFIRM CAPTURE. Supports task, memory, note, idea, reflection, and decision. Expense and recurring task requests remain preview-only.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CaptureConfirmRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Unified capture saved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CaptureConfirmResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Capture was not saved because confirmation was missing, invalid, or the capture type is unsupported."
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -1020,6 +1052,65 @@
                     "resolved_project",
                     "preview",
                     "supported_confirm_endpoint",
+                    "warnings"
+                ]
+            },
+            "CaptureConfirmRequest": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string"
+                    },
+                    "project": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "recommended_type": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "default": "text"
+                    },
+                    "capture_source": {
+                        "type": "string",
+                        "default": "manual"
+                    },
+                    "confirmation": {
+                        "type": "string",
+                        "description": "Must exactly equal CONFIRM CAPTURE."
+                    }
+                },
+                "required": [
+                    "text",
+                    "confirmation"
+                ]
+            },
+            "CaptureConfirmResponse": {
+                "type": "object",
+                "properties": {
+                    "confirmed": {
+                        "type": "boolean"
+                    },
+                    "created_type": {
+                        "type": "string"
+                    },
+                    "saved": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "confirmed",
+                    "created_type",
+                    "saved",
                     "warnings"
                 ]
             }
