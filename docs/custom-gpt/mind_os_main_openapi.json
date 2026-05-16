@@ -553,38 +553,6 @@
                 }
             }
         },
-        "/capture/confirm": {
-            "post": {
-                "operationId": "confirmCapture",
-                "summary": "Confirm unified capture",
-                "description": "Saves a previously reviewed unified capture only when the user's latest message explicitly contains the exact phrase CONFIRM CAPTURE. Do not infer confirmation from words like confirm, save, yes, ok, proceed, or create. If the exact phrase CONFIRM CAPTURE is not present in the user's latest message, do not call this action; ask the user to type CONFIRM CAPTURE. Supports task, memory, note, idea, reflection, and decision. Expense and recurring task requests remain preview-only.",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CaptureConfirmRequest"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Unified capture saved",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/CaptureConfirmResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Capture was not saved because confirmation was missing, invalid, or the capture type is unsupported."
-                    }
-                }
-            }
-        },
         "/dashboard/unified": {
             "get": {
                 "operationId": "getUnifiedDashboard",
