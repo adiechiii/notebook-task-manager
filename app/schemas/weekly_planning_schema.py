@@ -15,6 +15,7 @@ class WeeklyPlanningResponse(BaseModel):
     project_plans: list[dict[str, Any]]
     decision_followups: list[dict[str, Any]]
     risks: list[dict[str, Any]]
+    cognition_priorities: list[dict[str, Any]]
     recommended_actions: list[dict[str, Any]]
     evidence: dict[str, Any]
     signals_used: list[str]
