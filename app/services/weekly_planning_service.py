@@ -111,6 +111,7 @@ def _focus_areas(
     smart_priorities: dict[str, Any],
     insights: dict[str, Any],
     command_center: dict[str, list[dict[str, Any]]],
+    cognition_priorities: list[dict[str, Any]],
     limit: int,
 ) -> list[dict[str, Any]]:
     focus = []
@@ -127,7 +128,23 @@ def _focus_areas(
             }
         )
 
+    for cognition in cognition_priorities:
+        evidence = cognition.get("evidence") or {}
+        task = evidence.get("task") or {}
+        focus.append(
+            {
+                "type": "cognition_priority",
+                "title": cognition.get("title") or "Review cognition priority",
+                "reason": cognition.get("description"),
+                "suggested_action": task.get("title") or cognition.get("recommended_action"),
+                "evidence": evidence,
+            }
+        )
+
     for risk in insights.get("risks", []):
+        if risk.get("type") == "cognition_priority":
+            continue
+
         focus.append(
             {
                 "type": risk.get("type"),
@@ -294,12 +311,45 @@ def _decision_followups(decisions: list[dict[str, Any]], tasks: list[dict[str, A
     return followups[:limit]
 
 
+def _cognition_priorities(insights: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+    from_evidence = ((insights.get("evidence") or {}).get("cognition_priorities") or [])
+    from_insights = [
+        item
+        for item in insights.get("insights", [])
+        if item.get("type") == "cognition_priority"
+    ]
+
+    combined = []
+    seen = set()
+
+    for item in list(from_evidence) + list(from_insights):
+        evidence = item.get("evidence") or {}
+        task = evidence.get("task") or {}
+        key = _key(
+            " ".join(
+                [
+                    str(item.get("type") or ""),
+                    str(task.get("title") or task.get("text") or ""),
+                    str(task.get("project") or ""),
+                ]
+            )
+        )
+        if not key or key in seen:
+            continue
+
+        combined.append(item)
+        seen.add(key)
+
+    return combined[:limit]
+
+
 def _weekly_plan(
     counts: dict[str, int],
     priority_tasks: list[dict[str, Any]],
     project_plans: list[dict[str, Any]],
     decision_followups: list[dict[str, Any]],
     risks: list[dict[str, Any]],
+    cognition_priorities: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
         "mode": "dry_run_weekly_plan",
@@ -334,6 +384,14 @@ def _weekly_plan(
                 "Resolve Critical and High risks before adding new weekly commitments."
                 if risks
                 else "No major risks detected."
+            ),
+        },
+        "cognition_context": {
+            "priority_count": len(cognition_priorities),
+            "suggested_action": (
+                "Use cognition priority evidence when choosing weekly focus blocks."
+                if cognition_priorities
+                else "No cognition priority evidence detected."
             ),
         },
     }
@@ -470,7 +528,14 @@ def build_weekly_planning(
     project_plans = _project_plans(project_rollups, smart_priorities, safe_limit)
     decision_followups = _decision_followups(decisions, scoped_tasks, safe_limit)
     risks = insights.get("risks", [])[:safe_limit]
-    focus_areas = _focus_areas(smart_priorities, insights, command_center, safe_limit)
+    cognition_priorities = _cognition_priorities(insights, safe_limit)
+    focus_areas = _focus_areas(
+        smart_priorities,
+        insights,
+        command_center,
+        cognition_priorities,
+        safe_limit,
+    )
     recommended_actions = _limited(
         insights.get("recommended_actions", []) + unified_review.get("recommended_focus", []),
         safe_limit,
@@ -491,12 +556,14 @@ def build_weekly_planning(
             project_plans,
             decision_followups,
             risks,
+            cognition_priorities,
         ),
         "focus_areas": focus_areas,
         "priority_tasks": priority_tasks,
         "project_plans": project_plans,
         "decision_followups": decision_followups,
         "risks": risks,
+        "cognition_priorities": cognition_priorities,
         "recommended_actions": recommended_actions,
         "evidence": {
             "counts": counts,
@@ -504,6 +571,7 @@ def build_weekly_planning(
             "insights_summary": insights.get("summary", {}),
             "weekly_review_tasks": weekly_review.get("tasks", {}),
             "project_rollups": project_rollups.get("items", [])[:safe_limit],
+            "cognition_priorities": cognition_priorities,
             "unlinked_tasks": project_rollups.get("unlinked_tasks", 0),
             "unlinked_memories": project_rollups.get("unlinked_memories", 0),
             "unmatched_project_tasks": project_rollups.get("unmatched_project_tasks", 0),
@@ -519,6 +587,8 @@ def build_weekly_planning(
             "weekly_review",
             "carryover",
             "project_rollups",
+            "cognition_priorities",
+            "related_memory_relevance",
         ],
         "warnings": _warnings(
             project_rollups,
