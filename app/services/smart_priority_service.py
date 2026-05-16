@@ -8,6 +8,8 @@ from app.repositories.sheets_project_repository import SheetsProjectRepository
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.services.command_center_service import build_command_center
 from app.services.project_rollup_service import build_project_rollups
+from app.services.priority_scoring_service import score_priority
+from app.services.related_memory_service import find_related_memories
 
 
 URGENCY_PATTERNS = {
@@ -274,52 +276,56 @@ def _score_task(
     bucket: str,
     project_metadata: dict[str, dict[str, Any]],
     project_rollups: dict[str, dict[str, Any]],
-    high_decision_projects: set[str],
-    medium_decision_projects: set[str],
+    decisions: list[dict[str, Any]],
+    memories: list[dict[str, Any]],
     repeated_counts: dict[str, int],
     project_task_counts: dict[str, int],
 ) -> dict[str, Any]:
-    score_breakdown = {
-        "due_date": 0,
-        "manual_priority": 0,
-        "project_importance": 0,
-        "decision_importance": 0,
-        "project_linkage": 0,
-        "blockers_risks": 0,
-        "urgency_indicators": 0,
-        "repeated_mentions": 0,
-    }
-    reasons = []
-
-    due_points, due_reasons = _due_date_points(task, bucket)
-    score_breakdown["due_date"] = due_points
-    reasons.extend(due_reasons)
-
-    priority_points, priority_reason = _priority_points(task.get("priority"))
-    score_breakdown["manual_priority"] = priority_points
-    if priority_reason:
-        reasons.append(priority_reason)
-
     project_key = _key(task.get("project"))
     project_info = project_metadata.get(project_key, {})
-    project_points, project_reason = _importance_points(project_info.get("priority"))
-    score_breakdown["project_importance"] = project_points
-    if project_reason:
-        reasons.append(project_reason)
+    task_text = " ".join(
+        [
+            _clean(task.get("title")),
+            _clean(task.get("text")),
+        ]
+    ).strip()
 
-    if project_key:
-        score_breakdown["project_linkage"] = 5
-        reasons.append("Task is linked to a project.")
-    else:
-        score_breakdown["project_linkage"] = -8
-        reasons.append("Task is not linked to a project.")
+    task_project = _clean(task.get("project"))
+    related_decisions = (
+        [
+            decision
+            for decision in decisions or []
+            if task_project and _project_matches(decision.get("project"), task_project)
+        ]
+        if task_project
+        else []
+    )
+    related_memories = find_related_memories(
+        text=task_text,
+        project=_clean(task.get("project")),
+        memories=memories,
+        limit=3,
+    )
 
-    if project_key in high_decision_projects:
-        score_breakdown["decision_importance"] = 30
-        reasons.append("Task is linked to a project with a High-Importance decision.")
-    elif project_key in medium_decision_projects:
-        score_breakdown["decision_importance"] = 12
-        reasons.append("Task is linked to a project with a Medium-Importance decision.")
+    priority_scoring = score_priority(
+        text=task_text,
+        manual_priority=task.get("priority") or "",
+        due_date=task.get("page_date") or "",
+        project=task.get("project") or "",
+        project_metadata=project_info,
+        related_decisions=related_decisions,
+        related_memories=related_memories,
+        task_context={"bucket": bucket},
+    )
+
+    score_breakdown = dict(priority_scoring.get("score_breakdown", {}))
+    score_breakdown.setdefault("blockers_risks", 0)
+    score_breakdown.setdefault("repeated_mentions", 0)
+
+    reasons = []
+    scoring_reason = _clean(priority_scoring.get("scoring_reason"))
+    if scoring_reason:
+        reasons.append(scoring_reason)
 
     rollup = project_rollups.get(project_key, {})
     if bucket == "overdue" and _key(task.get("priority")) == "high":
@@ -334,10 +340,6 @@ def _score_task(
         score_breakdown["blockers_risks"] += 8
         reasons.append("Linked project has a large no-date backlog.")
 
-    urgency_points, urgency_reasons, urgency_matches = _urgency_points(task)
-    score_breakdown["urgency_indicators"] = urgency_points
-    reasons.extend(urgency_reasons)
-
     title_key = _key(task.get("title") or task.get("text"))
     repeated_count = repeated_counts.get(title_key, 0)
     if repeated_count >= 2:
@@ -349,7 +351,7 @@ def _score_task(
         score_breakdown["repeated_mentions"] += 5
         reasons.append("Project appears repeatedly across active tasks.")
 
-    smart_score = sum(score_breakdown.values())
+    smart_score = sum(int(value or 0) for value in score_breakdown.values())
 
     if smart_score >= 90:
         priority_band = "critical"
@@ -359,6 +361,8 @@ def _score_task(
         priority_band = "medium"
     else:
         priority_band = "low"
+
+    priority_signals = priority_scoring.get("signals", {})
 
     return {
         "task_id": task.get("task_id"),
@@ -374,7 +378,10 @@ def _score_task(
         "priority_band": priority_band,
         "score_breakdown": score_breakdown,
         "reasons": reasons or ["Selected from active task list."],
-        "matched_urgency_indicators": urgency_matches,
+        "matched_urgency_indicators": priority_signals.get("matched_urgency_indicators", []),
+        "priority_scoring": priority_scoring,
+        "related_decisions": [_slim_decision(decision) for decision in related_decisions[:3]],
+        "related_memories": related_memories,
     }
 
 
@@ -535,8 +542,8 @@ def build_smart_priorities(
                 bucket=_bucket_for_task(task, bucket_lookup),
                 project_metadata=project_info,
                 project_rollups=rollups_by_key,
-                high_decision_projects=high_decision_projects,
-                medium_decision_projects=medium_decision_projects,
+                decisions=decisions,
+                memories=scoped_memories,
                 repeated_counts=repeated_counts,
                 project_task_counts=project_counts,
             )
@@ -586,6 +593,7 @@ def build_smart_priorities(
             "manual_priority",
             "project_importance",
             "decision_importance",
+            "related_memories",
             "repeated_mentions",
             "urgency_indicators",
             "project_linkage",

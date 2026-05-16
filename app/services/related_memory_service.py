@@ -96,6 +96,20 @@ def _memory_relevance(
         score += 10
         reasons.append("entity overlap: " + ", ".join(entity_overlap[:3]))
 
+    has_direct_relevance = bool(
+        overlap
+        or _project_matches(memory.get("project"), project)
+        or tag_overlap
+        or entity_overlap
+    )
+
+    if not has_direct_relevance:
+        return {
+            "memory": memory,
+            "score": 0,
+            "reasons": [],
+        }
+
     score += _importance_points(memory.get("importance"))
     if _importance_points(memory.get("importance")):
         reasons.append(f"{_clean(memory.get('importance'))} importance")
