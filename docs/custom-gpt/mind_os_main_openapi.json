@@ -523,6 +523,35 @@
                     }
                 }
             }
+        },
+        "/capture/preview": {
+            "post": {
+                "operationId": "previewCapture",
+                "summary": "Preview unified capture",
+                "description": "Read-only unified capture preview. Classifies input as task, memory, decision, note, idea, reflection, expense request, or recurring task request. Does not write or save anything.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CapturePreviewRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Unified capture preview result. Read-only. Does not save anything.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CapturePreviewResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -921,6 +950,76 @@
                     "limit",
                     "count",
                     "decisions",
+                    "warnings"
+                ]
+            },
+            "CapturePreviewRequest": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string"
+                    },
+                    "project": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "default": "text"
+                    },
+                    "capture_source": {
+                        "type": "string",
+                        "default": "manual"
+                    }
+                },
+                "required": [
+                    "text"
+                ]
+            },
+            "CapturePreviewResponse": {
+                "type": "object",
+                "properties": {
+                    "dry_run": {
+                        "type": "boolean"
+                    },
+                    "writes": {
+                        "type": "boolean"
+                    },
+                    "recommended_type": {
+                        "type": "string"
+                    },
+                    "confidence": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "resolved_project": {
+                        "type": "string"
+                    },
+                    "preview": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "supported_confirm_endpoint": {
+                        "type": "string"
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "dry_run",
+                    "writes",
+                    "recommended_type",
+                    "confidence",
+                    "reason",
+                    "resolved_project",
+                    "preview",
+                    "supported_confirm_endpoint",
                     "warnings"
                 ]
             }
