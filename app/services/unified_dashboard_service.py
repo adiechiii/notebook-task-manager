@@ -7,6 +7,8 @@ from app.repositories.sheets_project_repository import SheetsProjectRepository
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.services.command_center_service import build_command_center
 from app.services.project_rollup_service import build_project_rollups
+from app.services.priority_scoring_service import score_priority
+from app.services.related_memory_service import find_related_memories
 
 
 VALID_MODES = {"overview", "today", "focus", "project"}
@@ -168,7 +170,9 @@ def _task_score(task: dict[str, Any], bucket: str, high_decision_projects: set[s
 
 def _rank_focus_tasks(
     command_center: dict[str, list[dict[str, Any]]],
-    high_decision_projects: set[str],
+    decisions: list[dict[str, Any]],
+    memories: list[dict[str, Any]],
+    project_metadata: dict[str, dict[str, Any]],
     limit: int,
 ) -> list[dict[str, Any]]:
     candidates = []
@@ -178,12 +182,56 @@ def _rank_focus_tasks(
             if not _is_active_task(task):
                 continue
 
+            task_project = _clean(task.get("project"))
+            task_text = " ".join(
+                [
+                    _clean(task.get("title")),
+                    _clean(task.get("text")),
+                ]
+            ).strip()
+            related_decisions = (
+                [
+                    decision
+                    for decision in decisions or []
+                    if task_project and _project_matches(decision.get("project"), task_project)
+                ]
+                if task_project
+                else []
+            )
+            related_memories = find_related_memories(
+                text=task_text,
+                project=task_project,
+                memories=memories,
+                limit=3,
+            )
+            project_info = project_metadata.get(_key(task_project), {})
+
+            priority_scoring = score_priority(
+                text=task_text,
+                manual_priority=task.get("priority") or "",
+                due_date=task.get("page_date") or "",
+                project=task_project,
+                project_metadata=project_info,
+                related_decisions=related_decisions,
+                related_memories=related_memories,
+                task_context={"bucket": bucket},
+            )
+
             slim = _slim_task(task)
-            slim["score"] = _task_score(task, bucket, high_decision_projects)
-            slim["reason"] = _focus_reason(task, bucket, high_decision_projects)
+            slim["score"] = int(priority_scoring.get("score", 0) or 0)
+            slim["priority_band"] = priority_scoring.get("priority_band")
+            slim["reason"] = priority_scoring.get("scoring_reason") or _focus_reason(task, bucket, set())
+            slim["priority_scoring"] = priority_scoring
+            slim["related_decisions"] = [_slim_decision(decision) for decision in related_decisions[:3]]
+            slim["related_memories"] = related_memories
             candidates.append(slim)
 
-    candidates.sort(key=lambda item: item.get("score", 0), reverse=True)
+    candidates.sort(
+        key=lambda item: (
+            -int(item.get("score", 0) or 0),
+            _key(item.get("title")),
+        )
+    )
     return candidates[:limit]
 
 
@@ -252,6 +300,25 @@ def _high_decision_projects(decisions: list[dict[str, Any]]) -> set[str]:
         for decision in decisions
         if _key(decision.get("importance")) == "high" and _key(decision.get("project"))
     }
+
+
+def _project_metadata(projects: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    metadata = {}
+
+    for project in projects or []:
+        project_key = _key(project.get("name"))
+        if not project_key:
+            continue
+
+        metadata[project_key] = {
+            "name": project.get("name"),
+            "status": project.get("status"),
+            "priority": project.get("priority"),
+            "category": project.get("category"),
+            "tags": project.get("tags"),
+        }
+
+    return metadata
 
 
 def _project_next_action(project_name: str, command_center: dict[str, list[dict[str, Any]]]) -> dict[str, Any] | None:
@@ -608,9 +675,13 @@ def build_unified_dashboard(
         safe_limit,
     )
 
+    project_metadata = _project_metadata(scoped_projects)
+
     focus_tasks = _rank_focus_tasks(
         command_center,
-        high_decision_projects,
+        decisions,
+        scoped_memories,
+        project_metadata,
         min(safe_limit, 5),
     )
     counts = _counts(command_center)
@@ -641,7 +712,7 @@ def build_unified_dashboard(
         },
         "focus": {
             "top_tasks": focus_tasks,
-            "reason": "Selected from due date, overdue status, priority, project linkage, urgency, and high-importance decisions.",
+            "reason": "Selected using shared cognition scoring: due date, overdue status, priority, project linkage, urgency, decisions, and related memories.",
         },
         "task_buckets": _bucketed_slim_tasks(command_center, safe_limit),
         "project_rollups": project_rollups,
