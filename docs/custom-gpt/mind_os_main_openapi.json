@@ -641,6 +641,64 @@
                     }
                 }
             }
+        },
+        "/review/unified": {
+            "get": {
+                "operationId": "getUnifiedReview",
+                "summary": "Get unified Mind OS review",
+                "description": "Read-only unified review engine for nightly, weekly, monthly, quarterly, and annual reviews. Summarizes progress, unfinished work, decisions, memories, blockers, patterns, risks, recommended focus, and carryover.",
+                "parameters": [
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "weekly",
+                            "enum": [
+                                "nightly",
+                                "weekly",
+                                "monthly",
+                                "quarterly",
+                                "annual"
+                            ]
+                        },
+                        "description": "Review period."
+                    },
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        },
+                        "description": "Optional project name to scope the review."
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        },
+                        "description": "Maximum number of items per section."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Unified review result. Read-only. Does not save, update, delete, archive, or confirm anything.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnifiedReviewResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -1261,6 +1319,107 @@
                     "risks",
                     "execution_progress",
                     "recommendations",
+                    "warnings"
+                ]
+            },
+            "UnifiedReviewResponse": {
+                "type": "object",
+                "properties": {
+                    "dry_run": {
+                        "type": "boolean"
+                    },
+                    "writes": {
+                        "type": "boolean"
+                    },
+                    "generated_at": {
+                        "type": "string"
+                    },
+                    "scope": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "summary": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "progress": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "unfinished_work": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "decisions": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "memories": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "blockers": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "patterns": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "risks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "recommended_focus": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "carryover": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "period_review": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "dry_run",
+                    "writes",
+                    "generated_at",
+                    "scope",
+                    "summary",
+                    "progress",
+                    "unfinished_work",
+                    "decisions",
+                    "memories",
+                    "blockers",
+                    "patterns",
+                    "risks",
+                    "recommended_focus",
+                    "carryover",
+                    "period_review",
                     "warnings"
                 ]
             }
