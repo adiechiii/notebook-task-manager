@@ -699,6 +699,42 @@
                     }
                 }
             }
+        },
+        "/priorities/smart": {
+            "get": {
+                "operationId": "getSmartPriorities",
+                "summary": "Get smart task priorities",
+                "description": "Read-only smart priority ranking for active tasks. Use this when the user asks what to prioritize, what matters most, what should be done first, or how tasks should be ranked dynamically. Returns dry_run true and writes false. Does not update task priority or save anything.",
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        },
+                        "description": "Optional project filter."
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "minimum": 1,
+                            "maximum": 50
+                        },
+                        "description": "Maximum number of ranked tasks to return."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Dry-run smart priority ranking with ranked tasks, score breakdowns, decision context, project context, blockers, risks, and warnings."
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -1422,6 +1458,68 @@
                     "period_review",
                     "warnings"
                 ]
+            },
+            "SmartPrioritiesResponse": {
+                "type": "object",
+                "properties": {
+                    "dry_run": {
+                        "type": "boolean"
+                    },
+                    "writes": {
+                        "type": "boolean"
+                    },
+                    "generated_at": {
+                        "type": "string"
+                    },
+                    "scope": {
+                        "type": "object"
+                    },
+                    "summary": {
+                        "type": "object"
+                    },
+                    "ranked_tasks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "decision_context": {
+                        "type": "object"
+                    },
+                    "project_context": {
+                        "type": "object"
+                    },
+                    "blockers": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "risks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "signals_used": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "future_signals": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
             }
         }
     }
