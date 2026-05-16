@@ -2,13 +2,16 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from app.services.capture_preview_service import classify_capture_type
+from app.services.capture_preview_service import (
+    _cognition_for_capture,
+    classify_capture_type,
+)
 from app.services.category_service import classify_category
 from app.services.date_parser_service import normalize_task_title, parse_date_from_text
 from app.services.duplicate_detection_service import find_duplicate_task
 from app.services.memory_classification_service import classify_memory
+from app.services.priority_scoring_service import score_priority
 from app.services.priority_service import parse_priority_from_text
-from app.services.project_linking_service import resolve_project
 
 
 CAPTURE_CONFIRMATION = "CONFIRM CAPTURE"
@@ -38,16 +41,45 @@ def _base_blocked_response(created_type: str, warning: str) -> dict[str, Any]:
     }
 
 
+def _safe_cognition(text: str, project: str, warnings: list[str]) -> dict[str, Any]:
+    cognition = _cognition_for_capture(
+        text=text,
+        explicit_project=project or "",
+        warnings=warnings,
+    )
+
+    return {
+        "resolved_project": cognition.get("resolved_project", ""),
+        "project_linking": cognition.get("project_linking", {}),
+        "related_memories": cognition.get("related_memories", []),
+        "related_decisions": cognition.get("related_decisions", []),
+        "project_metadata": cognition.get("project_metadata", {}),
+    }
+
+
 def _confirm_task(text: str, project: str, task_repo=None) -> dict[str, Any]:
     if task_repo is None:
         from app.repositories.sheets_task_repository import SheetsTaskRepository
 
         task_repo = SheetsTaskRepository()
 
-    resolved_project = resolve_project(text, project or "")
+    warnings: list[str] = []
+    cognition = _safe_cognition(text, project, warnings)
+    resolved_project = cognition["resolved_project"]
+
     normalized_title = normalize_task_title(text)
     page_date = parse_date_from_text(text)
-    priority = parse_priority_from_text(text)
+    parsed_priority = parse_priority_from_text(text)
+    priority_scoring = score_priority(
+        text=text,
+        manual_priority=parsed_priority,
+        due_date=page_date,
+        project=resolved_project,
+        project_metadata=cognition["project_metadata"],
+        related_decisions=cognition["related_decisions"],
+        related_memories=cognition["related_memories"],
+    )
+    priority = priority_scoring.get("priority") or parsed_priority
     category = classify_category(text)
 
     duplicate_result = find_duplicate_task(
@@ -72,7 +104,6 @@ def _confirm_task(text: str, project: str, task_repo=None) -> dict[str, Any]:
         project=resolved_project,
     )
 
-    warnings = []
     if duplicate_result["duplicate"]:
         warnings.append("Possible duplicate task was saved and marked for review.")
 
@@ -86,9 +117,13 @@ def _confirm_task(text: str, project: str, task_repo=None) -> dict[str, Any]:
             "status": "Pending",
             "page_date": page_date,
             "priority": priority,
+            "parsed_priority": parsed_priority,
             "category": category,
             "project": resolved_project,
             "duplicate": duplicate_result["duplicate"],
+            "project_linking": cognition["project_linking"],
+            "priority_scoring": priority_scoring,
+            "related_memories": cognition["related_memories"],
         },
         "warnings": warnings,
     }
@@ -100,7 +135,10 @@ def _confirm_memory(text: str, project: str, created_type: str, memory_repo=None
 
         memory_repo = SheetsMemoryRepository()
 
-    resolved_project = resolve_project(text, project or "")
+    warnings: list[str] = []
+    cognition = _safe_cognition(text, project, warnings)
+    resolved_project = cognition["resolved_project"]
+
     classification = classify_memory(text)
 
     if resolved_project:
@@ -125,8 +163,10 @@ def _confirm_memory(text: str, project: str, created_type: str, memory_repo=None
             "memory_id": memory_id,
             "text": text,
             "classification": classification,
+            "project_linking": cognition["project_linking"],
+            "related_memories": cognition["related_memories"],
         },
-        "warnings": [],
+        "warnings": warnings,
     }
 
 
@@ -134,11 +174,11 @@ def _decision_item(
     *,
     text: str,
     project: str,
+    importance: str,
     source_type: str,
     capture_source: str,
 ) -> dict[str, Any]:
     now = datetime.utcnow().isoformat()
-    resolved_project = resolve_project(text, project or "")
 
     return {
         "decision_id": str(uuid.uuid4()),
@@ -147,10 +187,10 @@ def _decision_item(
         "rationale": "",
         "outcome": "",
         "tradeoffs": "",
-        "project": resolved_project,
+        "project": project,
         "tags": "",
         "status": "Active",
-        "importance": parse_priority_from_text(text) or "Medium",
+        "importance": importance,
         "source_type": source_type or "text",
         "capture_source": capture_source or "manual",
         "created_at": now,
@@ -171,16 +211,32 @@ def _confirm_decision(
 
         decision_repo = SheetsDecisionRepository()
 
+    warnings: list[str] = []
+    cognition = _safe_cognition(text, project, warnings)
+    resolved_project = cognition["resolved_project"]
+
+    parsed_importance = parse_priority_from_text(text) or "Medium"
+    priority_scoring = score_priority(
+        text=text,
+        manual_priority=parsed_importance,
+        project=resolved_project,
+        project_metadata=cognition["project_metadata"],
+        related_decisions=cognition["related_decisions"],
+        related_memories=cognition["related_memories"],
+    )
+    importance = priority_scoring.get("priority") or parsed_importance
+
     inspection = decision_repo.inspect_schema()
     decision = _decision_item(
         text=text,
-        project=project,
+        project=resolved_project,
+        importance=importance,
         source_type=source_type,
         capture_source=capture_source,
     )
 
     if not inspection["exists"] or inspection["headers_match"] is not True:
-        warnings = list(inspection["warnings"])
+        warnings.extend(inspection["warnings"])
         warnings.append("Decision was not saved because the Decisions schema is not ready.")
         return {
             "confirmed": False,
@@ -194,7 +250,6 @@ def _confirm_decision(
         decision["project"],
     )
 
-    warnings = []
     if duplicate_candidates:
         warnings.append("Possible duplicate decision found. Decision was saved anyway.")
 
@@ -208,6 +263,10 @@ def _confirm_decision(
             "decision": result["decision"],
             "schema_ok": result["schema_ok"],
             "duplicate_candidates": duplicate_candidates,
+            "parsed_importance": parsed_importance,
+            "project_linking": cognition["project_linking"],
+            "priority_scoring": priority_scoring,
+            "related_memories": cognition["related_memories"],
         },
         "warnings": warnings,
     }
