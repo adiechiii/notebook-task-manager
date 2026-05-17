@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 DECISIONS_WORKSHEET_NAME = "Decisions"
@@ -114,3 +114,21 @@ class DecisionSearchResponse(BaseModel):
     count: int
     decisions: list[DecisionPreviewItem]
     warnings: list[str]
+
+class DecisionUpdateRequest(BaseModel):
+    decision_id: str
+    decision: str | None = None
+    context: str | None = None
+    rationale: str | None = None
+    outcome: str | None = None
+    tradeoffs: str | None = None
+    project: str | None = None
+    tags: str | None = None
+    status: str | None = None
+    importance: str | None = None
+
+
+class DecisionUpdateResponse(BaseModel):
+    updated: bool
+    decision: DecisionPreviewItem | None = None
+    warnings: list[str] = Field(default_factory=list)

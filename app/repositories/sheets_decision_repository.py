@@ -5,6 +5,19 @@ from app.schemas.decision_schema import DECISIONS_HEADERS, DECISIONS_WORKSHEET_N
 SHEET_NAME = "NotebookTasksDB"
 
 
+DECISION_FIELD_TO_COLUMN = {
+    "decision": "Decision",
+    "context": "Context",
+    "rationale": "Rationale",
+    "outcome": "Outcome",
+    "tradeoffs": "Tradeoffs",
+    "project": "Project",
+    "tags": "Tags",
+    "status": "Status",
+    "importance": "Importance",
+}
+
+
 class SheetsDecisionRepository:
     def __init__(self):
         self.workbook = get_workbook(SHEET_NAME)
@@ -141,6 +154,67 @@ class SheetsDecisionRepository:
             "decision": decision,
             "warnings": [],
         }
+
+
+    def update_decision(self, decision_id: str, fields: dict):
+        inspection = self.inspect_schema()
+
+        if not inspection["exists"] or inspection["headers_match"] is not True:
+            return False, None, inspection["warnings"]
+
+        decision_id = str(decision_id or "").strip()
+
+        if not decision_id:
+            return False, None, ["Decision ID is required."]
+
+        updates = {
+            key: value
+            for key, value in (fields or {}).items()
+            if key in DECISION_FIELD_TO_COLUMN and value is not None
+        }
+
+        if not updates:
+            return False, None, ["No update fields were provided."]
+
+        worksheet = self._worksheet()
+        rows = worksheet.get_all_records()
+        matches = []
+
+        for i, row in enumerate(rows):
+            row_decision_id = str(row.get("Decision ID") or "").strip()
+            if row_decision_id == decision_id:
+                matches.append((i + 2, row))
+
+        if not matches:
+            return False, None, [f"No exact decision match found for ID '{decision_id}'."]
+
+        if len(matches) > 1:
+            return False, None, [f"Multiple exact decision matches found for ID '{decision_id}'. Update blocked."]
+
+        row_num, row = matches[0]
+        headers = worksheet.row_values(1)
+        header_to_index = {header: index for index, header in enumerate(headers, start=1)}
+        now = __import__("datetime").datetime.utcnow().isoformat()
+
+        for field, value in updates.items():
+            column_name = DECISION_FIELD_TO_COLUMN[field]
+            column_index = header_to_index.get(column_name)
+            if not column_index:
+                continue
+
+            worksheet.update_cell(row_num, column_index, str(value).strip())
+
+        updated_at_column = header_to_index.get("Updated At")
+        if updated_at_column:
+            worksheet.update_cell(row_num, updated_at_column, now)
+
+        updated_row = worksheet.row_values(row_num)
+        updated_record = {
+            headers[i]: updated_row[i] if i < len(updated_row) else ""
+            for i in range(len(headers))
+        }
+
+        return True, _decision_from_row(updated_record), []
 
     def search_decisions(
         self,

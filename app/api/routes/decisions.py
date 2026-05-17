@@ -16,6 +16,8 @@ from app.schemas.decision_schema import (
     DecisionCreatePreviewResponse,
     DecisionPreviewItem,
     DecisionSearchResponse,
+    DecisionUpdateRequest,
+    DecisionUpdateResponse,
     DecisionSchemaSetupRequest,
     DecisionSchemaSetupResponse,
     DecisionSchemaPreviewResponse,
@@ -247,6 +249,38 @@ def create_decision(request: DecisionCreateRequest):
         schema_ok=result["schema_ok"],
         duplicate_candidates=duplicate_candidates,
         decision=result["decision"],
+        warnings=warnings,
+    )
+
+
+@router.post(
+    "/decisions/update",
+    response_model=DecisionUpdateResponse,
+)
+def update_decision(request: DecisionUpdateRequest):
+    from app.repositories.sheets_decision_repository import SheetsDecisionRepository
+
+    repo = SheetsDecisionRepository()
+    provided_fields = getattr(
+        request,
+        "model_fields_set",
+        getattr(request, "__fields_set__", set()),
+    )
+
+    fields = {
+        field: getattr(request, field)
+        for field in provided_fields
+        if field != "decision_id"
+    }
+
+    updated, decision, warnings = repo.update_decision(
+        decision_id=request.decision_id,
+        fields=fields,
+    )
+
+    return DecisionUpdateResponse(
+        updated=updated,
+        decision=decision,
         warnings=warnings,
     )
 

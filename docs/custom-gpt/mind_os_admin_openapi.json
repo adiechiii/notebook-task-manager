@@ -74,6 +74,38 @@
           }
         }
       }
+    },
+    "/decisions/update": {
+      "post": {
+        "operationId": "updateDecision",
+        "summary": "Update existing decision metadata",
+        "description": "Safely updates an existing decision by exact decision_id. Does not create decisions automatically and does not touch projects, tasks, or memories.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decision update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionUpdateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -319,6 +351,174 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/MemoryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Warnings explaining blocked or partial updates."
+          }
+        }
+      },
+      "DecisionUpdateRequest": {
+        "type": "object",
+        "required": [
+          "decision_id"
+        ],
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "description": "Exact existing decision ID to update. Required."
+          },
+          "decision": {
+            "type": "string",
+            "description": "Optional updated decision text."
+          },
+          "context": {
+            "type": "string",
+            "description": "Optional decision context."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Optional decision rationale."
+          },
+          "outcome": {
+            "type": "string",
+            "description": "Optional decision outcome or follow-up result."
+          },
+          "tradeoffs": {
+            "type": "string",
+            "description": "Optional decision tradeoffs."
+          },
+          "project": {
+            "type": "string",
+            "description": "Optional linked project name."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Optional comma-separated tags."
+          },
+          "status": {
+            "type": "string",
+            "description": "Optional decision status, for example Active, Follow-up, Resolved, Archived."
+          },
+          "importance": {
+            "type": "string",
+            "description": "Optional importance level, for example High, Medium, Low."
+          }
+        },
+        "additionalProperties": false
+      },
+      "DecisionResponse": {
+        "type": "object",
+        "properties": {
+          "decision_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "context": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rationale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outcome": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tradeoffs": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "importance": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capture_source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "DecisionUpdateResponse": {
+        "type": "object",
+        "required": [
+          "updated",
+          "warnings"
+        ],
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "True only when an exact existing decision was updated."
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionResponse"
               },
               {
                 "type": "null"
