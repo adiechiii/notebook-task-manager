@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://notebook-task-manager.onrender.com"
+      "url": "https://notebook-task-manager-admin.onrender.com"
     }
   ],
   "paths": {
