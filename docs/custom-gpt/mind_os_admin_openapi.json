@@ -1,0 +1,171 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mind OS Admin Intelligence Extensions API",
+    "version": "1.0.0",
+    "description": "Admin and intelligence extension actions for Mind OS. Keep separate from the stable daily Mind OS Action 1."
+  },
+  "servers": [
+    {
+      "url": "https://notebook-task-manager.onrender.com"
+    }
+  ],
+  "paths": {
+    "/projects/update": {
+      "post": {
+        "operationId": "updateProject",
+        "summary": "Update existing project metadata",
+        "description": "Safely updates metadata for an existing project by exact project name. Does not create projects automatically and does not touch tasks, memories, or decisions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectUpdateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ProjectUpdateRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Exact existing project name to update. Required."
+          },
+          "priority": {
+            "type": "string",
+            "description": "Optional project priority, for example High, Medium, Low."
+          },
+          "category": {
+            "type": "string",
+            "description": "Optional project category."
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional project description."
+          },
+          "goal": {
+            "type": "string",
+            "description": "Optional project goal."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Optional comma-separated tags."
+          },
+          "status": {
+            "type": "string",
+            "description": "Optional project status, for example Active, Paused, Completed."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectResponse": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "goal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ProjectUpdateResponse": {
+        "type": "object",
+        "required": [
+          "updated",
+          "warnings"
+        ],
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "True only when an exact existing project was updated."
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Warnings explaining blocked or partial updates."
+          }
+        }
+      }
+    }
+  }
+}
