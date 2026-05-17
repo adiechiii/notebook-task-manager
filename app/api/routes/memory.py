@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 
 from app.repositories.sheets_memory_repository import SheetsMemoryRepository
-from app.schemas.memory_schema import MemoryCreateRequest
+from app.schemas.memory_schema import MemoryCreateRequest, MemoryUpdateRequest, MemoryUpdateResponse
 from app.services.memory_classification_service import classify_memory
 from app.services.project_linking_service import resolve_project
 
@@ -28,6 +28,32 @@ def create_memory(request: MemoryCreateRequest):
         "saved": request.text,
         "memory_id": memory_id,
         "classification": classification,
+    }
+
+
+@router.post("/memories/update", response_model=MemoryUpdateResponse)
+def update_memory(request: MemoryUpdateRequest):
+    provided_fields = getattr(
+        request,
+        "model_fields_set",
+        getattr(request, "__fields_set__", set()),
+    )
+
+    fields = {
+        field: getattr(request, field)
+        for field in provided_fields
+        if field != "memory_id"
+    }
+
+    updated, memory, warnings = repo.update_memory(
+        memory_id=request.memory_id,
+        fields=fields,
+    )
+
+    return {
+        "updated": updated,
+        "memory": memory,
+        "warnings": warnings,
     }
 
 

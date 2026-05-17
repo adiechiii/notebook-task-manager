@@ -42,6 +42,38 @@
           }
         }
       }
+    },
+    "/memories/update": {
+      "post": {
+        "operationId": "updateMemory",
+        "summary": "Update existing memory metadata",
+        "description": "Safely updates metadata for an existing memory by exact memory_id. Does not create memories automatically and does not touch projects, tasks, or decisions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUpdateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -151,6 +183,142 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ProjectResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Warnings explaining blocked or partial updates."
+          }
+        }
+      },
+      "MemoryUpdateRequest": {
+        "type": "object",
+        "required": [
+          "memory_id"
+        ],
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "description": "Exact existing memory ID to update. Required."
+          },
+          "memory_summary": {
+            "type": "string",
+            "description": "Optional updated memory summary."
+          },
+          "memory_type": {
+            "type": "string",
+            "description": "Optional memory type."
+          },
+          "entity": {
+            "type": "string",
+            "description": "Optional related entity."
+          },
+          "project": {
+            "type": "string",
+            "description": "Optional linked project name."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Optional comma-separated tags."
+          },
+          "importance": {
+            "type": "string",
+            "description": "Optional importance level, for example High, Medium, Low."
+          },
+          "status": {
+            "type": "string",
+            "description": "Optional memory status, for example Active or Archived."
+          }
+        },
+        "additionalProperties": false
+      },
+      "MemoryResponse": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "importance": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "MemoryUpdateResponse": {
+        "type": "object",
+        "required": [
+          "updated",
+          "warnings"
+        ],
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "True only when an exact existing memory was updated."
+          },
+          "memory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryResponse"
               },
               {
                 "type": "null"
