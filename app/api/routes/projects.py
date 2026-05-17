@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 
 from app.repositories.sheets_project_repository import SheetsProjectRepository
-from app.schemas.project_schema import ProjectCreateRequest, ProjectUpdateRequest, ProjectUpdateResponse
+from app.schemas.project_schema import ProjectCreateRequest, ProjectUpdateRequest, ProjectUpdateResponse, StaleProjectsResponse
 from app.services.project_dashboard_service import build_project_dashboard
 
 router = APIRouter()
@@ -46,6 +46,22 @@ def update_project(request: ProjectUpdateRequest):
         "warnings": warnings,
     }
 
+
+
+
+@router.get("/projects/stale", response_model=StaleProjectsResponse)
+def get_stale_projects(stale_after_days: int = Query(default=30)):
+    projects, warnings = repo.get_stale_projects(
+        stale_after_days=stale_after_days,
+        statuses={"active", "paused"},
+    )
+
+    return StaleProjectsResponse(
+        stale_after_days=max(int(stale_after_days or 30), 1),
+        count=len(projects),
+        projects=projects,
+        warnings=warnings,
+    )
 
 @router.get("/projects/search")
 def search_projects(query: str = Query(default="")):

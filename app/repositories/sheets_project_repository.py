@@ -138,3 +138,53 @@ class SheetsProjectRepository:
         }
 
         return True, self._project_from_row(updated_record), warnings
+
+    # =========================
+    # STALE
+    # =========================
+    def get_stale_projects(self, stale_after_days: int = 30, statuses: set[str] | None = None):
+        stale_after_days = max(int(stale_after_days or 30), 1)
+        statuses = statuses or {"active", "paused"}
+        now = datetime.utcnow()
+
+        rows = self.sheet.get_all_records()
+        stale_projects = []
+        warnings = []
+
+        for row in rows:
+            status = str(row.get("Status") or "").strip()
+            if status.casefold() not in statuses:
+                continue
+
+            updated_at = str(row.get("Updated At") or "").strip()
+            age_days = None
+
+            if updated_at:
+                try:
+                    age_days = (now - datetime.fromisoformat(updated_at)).days
+                except ValueError:
+                    warnings.append(
+                        f"Project '{row.get('Project Name')}' has an invalid Updated At value."
+                    )
+
+            if age_days is None:
+                stale_projects.append({
+                    **self._project_from_row(row),
+                    "age_days": None,
+                    "reason": "Missing or invalid Updated At value.",
+                })
+                continue
+
+            if age_days >= stale_after_days:
+                stale_projects.append({
+                    **self._project_from_row(row),
+                    "age_days": age_days,
+                    "reason": f"No update for {age_days} days.",
+                })
+
+        stale_projects.sort(
+            key=lambda project: project["age_days"] if project["age_days"] is not None else 10**9,
+            reverse=True,
+        )
+
+        return stale_projects, warnings

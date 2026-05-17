@@ -176,6 +176,38 @@
           }
         }
       }
+    },
+    "/projects/stale": {
+      "get": {
+        "operationId": "getStaleProjects",
+        "summary": "Get stale projects",
+        "description": "Read-only stale project detection. Returns Active and Paused projects that have not been updated for stale_after_days. Does not modify any data.",
+        "parameters": [
+          {
+            "name": "stale_after_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "minimum": 1
+            },
+            "description": "Number of days since Updated At before a project is considered stale."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stale projects result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaleProjectsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -894,6 +926,106 @@
             }
           },
           "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "StaleProjectResponseItem": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "goal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "StaleProjectsResponse": {
+        "type": "object",
+        "required": [
+          "stale_after_days",
+          "count",
+          "projects",
+          "warnings"
+        ],
+        "properties": {
+          "stale_after_days": {
+            "type": "integer",
+            "description": "Threshold used to determine stale projects."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of stale projects returned."
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaleProjectResponseItem"
+            }
+          },
+          "warnings": {
             "type": "array",
             "items": {
               "type": "string"
