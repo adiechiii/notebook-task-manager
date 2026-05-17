@@ -208,6 +208,59 @@
           }
         }
       }
+    },
+    "/decisions/followups": {
+      "get": {
+        "operationId": "getDecisionFollowups",
+        "summary": "Get follow-up decisions",
+        "description": "Read-only decision follow-up review. Returns decisions with Status = Follow-up, optionally filtered by exact project and importance. Does not modify decisions, tasks, projects, or memories.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            },
+            "description": "Optional exact project name filter."
+          },
+          {
+            "name": "importance",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            },
+            "description": "Optional exact importance filter, for example High, Medium, or Low."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Maximum number of follow-up decisions to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Follow-up decisions result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionFollowupsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1030,6 +1083,59 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "DecisionFollowupsResponse": {
+        "type": "object",
+        "required": [
+          "query",
+          "status",
+          "project",
+          "importance",
+          "limit",
+          "count",
+          "decisions",
+          "warnings"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Always empty for this follow-up endpoint."
+          },
+          "status": {
+            "type": "string",
+            "description": "Always Follow-up for this endpoint."
+          },
+          "project": {
+            "type": "string",
+            "description": "Optional exact project filter used in the request."
+          },
+          "importance": {
+            "type": "string",
+            "description": "Optional exact importance filter used in the request."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of decisions returned. Backend clamps this to 1-100."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of decisions returned."
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecisionResponse"
+            },
+            "description": "Decisions whose Status is Follow-up."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Warnings from schema or read checks."
           }
         }
       }

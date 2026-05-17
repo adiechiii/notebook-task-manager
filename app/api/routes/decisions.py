@@ -286,6 +286,38 @@ def update_decision(request: DecisionUpdateRequest):
 
 
 @router.get(
+    "/decisions/followups",
+    response_model=DecisionSearchResponse,
+)
+def get_decision_followups(
+    project: str = Query(default=""),
+    importance: str = Query(default=""),
+    limit: int = Query(default=50),
+):
+    from app.repositories.sheets_decision_repository import SheetsDecisionRepository
+
+    repo = SheetsDecisionRepository()
+    result = repo.search_decisions(
+        status="Follow-up",
+        project=project,
+        importance=importance,
+        limit=limit,
+    )
+    safe_limit = min(max(int(limit or 50), 1), 100)
+
+    return DecisionSearchResponse(
+        query="",
+        status="Follow-up",
+        project=project,
+        importance=importance,
+        limit=safe_limit,
+        count=len(result["decisions"]),
+        decisions=result["decisions"],
+        warnings=result["warnings"],
+    )
+
+
+@router.get(
     "/decisions/search",
     response_model=DecisionSearchResponse,
 )
