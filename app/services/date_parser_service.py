@@ -1,5 +1,7 @@
 from datetime import date, datetime, timedelta
+import os
 import re
+from zoneinfo import ZoneInfo
 
 
 WEEKDAYS = {
@@ -44,10 +46,12 @@ MONTHS = {
 LEADING_SCHEDULE_WORDS = r"(?:due(?:\s+on)?|on|by|for)"
 WEEKDAY_PATTERN = "|".join(WEEKDAYS)
 MONTH_PATTERN = "|".join(MONTHS)
+DEFAULT_TIMEZONE = "Asia/Dubai"
 
 
 def _today():
-    return datetime.utcnow().date()
+    timezone_name = os.getenv("MIND_OS_TIMEZONE", DEFAULT_TIMEZONE)
+    return datetime.now(ZoneInfo(timezone_name)).date()
 
 
 def _last_day_of_month(year, month):
