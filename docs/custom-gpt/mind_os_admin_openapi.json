@@ -106,6 +106,38 @@
           }
         }
       }
+    },
+    "/tasks/bulk-update": {
+      "post": {
+        "operationId": "bulkUpdateTasks",
+        "summary": "Bulk update existing tasks",
+        "description": "Safely updates existing tasks by exact task_id. Supports status, priority, category, project, and page_date only. Does not create tasks and does not edit task text/title.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBulkUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk task update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBulkUpdateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -531,6 +563,147 @@
               "type": "string"
             },
             "description": "Warnings explaining blocked or partial updates."
+          }
+        }
+      },
+      "TaskBulkUpdateItem": {
+        "type": "object",
+        "required": [
+          "task_id"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact existing task ID to update. Required."
+          },
+          "status": {
+            "type": "string",
+            "description": "Optional task status, for example Pending, Done, Archived."
+          },
+          "priority": {
+            "type": "string",
+            "description": "Optional task priority, for example High, Medium, Low."
+          },
+          "category": {
+            "type": "string",
+            "description": "Optional task category."
+          },
+          "project": {
+            "type": "string",
+            "description": "Optional linked project name."
+          },
+          "page_date": {
+            "type": "string",
+            "description": "Optional page/date value for the task."
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBulkUpdateRequest": {
+        "type": "object",
+        "required": [
+          "updates"
+        ],
+        "properties": {
+          "updates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBulkUpdateItem"
+            },
+            "description": "List of task updates to apply by exact task_id."
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBulkUpdateResponseItem": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "page_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completion_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "TaskBulkUpdateResponse": {
+        "type": "object",
+        "required": [
+          "updated_count",
+          "updated_tasks",
+          "warnings"
+        ],
+        "properties": {
+          "updated_count": {
+            "type": "integer",
+            "description": "Number of tasks successfully updated."
+          },
+          "updated_tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBulkUpdateResponseItem"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Warnings explaining skipped or blocked updates."
           }
         }
       }

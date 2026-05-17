@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.schemas.update_schema import UpdateRequest
+from app.schemas.update_schema import UpdateRequest, TaskBulkUpdateRequest, TaskBulkUpdateResponse
 from app.repositories.sheets_status_log_repository import SheetsStatusLogRepository
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 
@@ -28,3 +28,15 @@ def update_task(request: UpdateRequest):
         logged = True
 
     return {"updated": update_succeeded, "logged": logged}
+
+@router.post("/tasks/bulk-update", response_model=TaskBulkUpdateResponse)
+def bulk_update_tasks(request: TaskBulkUpdateRequest):
+    updated_tasks, warnings = repo.bulk_update_tasks(
+        updates=[item.model_dump() for item in request.updates],
+    )
+
+    return TaskBulkUpdateResponse(
+        updated_count=len(updated_tasks),
+        updated_tasks=updated_tasks,
+        warnings=warnings,
+    )

@@ -4,6 +4,15 @@ from datetime import datetime
 from app.integrations.google_sheets_client import get_workbook
 
 
+TASK_BULK_FIELD_TO_COLUMN = {
+    "status": "Status",
+    "priority": "Priority",
+    "category": "Category",
+    "project": "Project",
+    "page_date": "Page Date",
+}
+
+
 class SheetsTaskRepository:
     def __init__(self):
         self.sheet = get_workbook("NotebookTasksDB").worksheet("Tasks")
@@ -341,3 +350,116 @@ class SheetsTaskRepository:
             })
 
         return tasks
+
+    def _task_from_row(self, row):
+        return {
+            "task_id": row.get("Task ID"),
+            "text": row.get("Raw Text"),
+            "title": row.get("Normalized Title"),
+            "status": row.get("Status"),
+            "page_date": str(row.get("Page Date", "")).strip(),
+            "category": row.get("Category"),
+            "priority": row.get("Priority"),
+            "project": row.get("Project"),
+            "updated_at": row.get("Updated At"),
+            "completion_date": row.get("Completion Date"),
+        }
+
+    def bulk_update_tasks(self, updates: list[dict]):
+        warnings = []
+        cleaned_updates = []
+        seen_task_ids = set()
+
+        for item in updates or []:
+            task_id = str(item.get("task_id") or "").strip()
+
+            if not task_id:
+                warnings.append("Skipped an update because task_id is required.")
+                continue
+
+            if task_id in seen_task_ids:
+                warnings.append(f"Duplicate task_id '{task_id}' in request. Bulk update blocked.")
+                return [], warnings
+
+            seen_task_ids.add(task_id)
+
+            fields = {
+                key: value
+                for key, value in item.items()
+                if key in TASK_BULK_FIELD_TO_COLUMN and value is not None
+            }
+
+            if not fields:
+                warnings.append(f"Skipped task_id '{task_id}' because no update fields were provided.")
+                continue
+
+            cleaned_updates.append({
+                "task_id": task_id,
+                "fields": fields,
+            })
+
+        if not cleaned_updates:
+            return [], warnings or ["No valid task updates were provided."]
+
+        rows = self.sheet.get_all_records()
+        headers = self.sheet.row_values(1)
+        header_to_index = {header: index for index, header in enumerate(headers, start=1)}
+
+        row_matches = {}
+        duplicate_sheet_ids = set()
+
+        for i, row in enumerate(rows):
+            task_id = str(row.get("Task ID") or "").strip()
+            if not task_id:
+                continue
+
+            if task_id in row_matches:
+                duplicate_sheet_ids.add(task_id)
+                continue
+
+            row_matches[task_id] = (i + 2, row)
+
+        if duplicate_sheet_ids:
+            warnings.append("Bulk update blocked because duplicate Task IDs were found in the sheet.")
+            return [], warnings
+
+        now = datetime.utcnow().isoformat()
+        updated_tasks = []
+
+        for update in cleaned_updates:
+            task_id = update["task_id"]
+            match = row_matches.get(task_id)
+
+            if not match:
+                warnings.append(f"No exact task match found for ID '{task_id}'. Skipped.")
+                continue
+
+            row_num, row = match
+            fields = update["fields"]
+
+            for field, value in fields.items():
+                column_name = TASK_BULK_FIELD_TO_COLUMN[field]
+                column_index = header_to_index.get(column_name)
+                if not column_index:
+                    warnings.append(f"Column '{column_name}' was not found. Field '{field}' was skipped for task_id '{task_id}'.")
+                    continue
+
+                self.sheet.update_cell(row_num, column_index, str(value).strip())
+
+            updated_at_column = header_to_index.get("Updated At")
+            if updated_at_column:
+                self.sheet.update_cell(row_num, updated_at_column, now)
+
+            if str(fields.get("status", "")).strip().lower() == "done":
+                completion_date_column = header_to_index.get("Completion Date")
+                if completion_date_column:
+                    self.sheet.update_cell(row_num, completion_date_column, now)
+
+            updated_row = self.sheet.row_values(row_num)
+            updated_record = {
+                headers[i]: updated_row[i] if i < len(updated_row) else ""
+                for i in range(len(headers))
+            }
+            updated_tasks.append(self._task_from_row(updated_record))
+
+        return updated_tasks, warnings
