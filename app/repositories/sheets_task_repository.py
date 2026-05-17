@@ -102,6 +102,12 @@ class SheetsTaskRepository:
         return False
 
     # =========================
+    # READ RAW ROWS
+    # =========================
+    def read_tasks(self):
+        return self.sheet.get_all_records()
+
+    # =========================
     # LIST
     # =========================
     def get_all_tasks(self, status=None):

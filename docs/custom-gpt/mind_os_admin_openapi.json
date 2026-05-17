@@ -261,6 +261,67 @@
           }
         }
       }
+    },
+    "/links/review": {
+      "get": {
+        "summary": "Review project links",
+        "operationId": "getLinksReview",
+        "parameters": [
+          {
+            "name": "include_valid_links",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Valid Links"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "area",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all",
+              "title": "Area"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkReviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Read-only review of task, memory, and decision project links. Detects missing and invalid project links without modifying data."
+      }
     }
   },
   "components": {
@@ -1138,6 +1199,221 @@
             "description": "Warnings from schema or read checks."
           }
         }
+      },
+      "LinkReviewAreaSummary": {
+        "properties": {
+          "checked": {
+            "type": "integer",
+            "title": "Checked",
+            "default": 0
+          },
+          "missing_project_links": {
+            "type": "integer",
+            "title": "Missing Project Links",
+            "default": 0
+          },
+          "invalid_project_links": {
+            "type": "integer",
+            "title": "Invalid Project Links",
+            "default": 0
+          },
+          "valid_project_links": {
+            "type": "integer",
+            "title": "Valid Project Links",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "LinkReviewAreaSummary"
+      },
+      "LinkReviewItem": {
+        "properties": {
+          "area": {
+            "type": "string",
+            "title": "Area"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          },
+          "issue_type": {
+            "type": "string",
+            "title": "Issue Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "issue_type",
+          "message"
+        ],
+        "title": "LinkReviewItem"
+      },
+      "LinkReviewResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "area": {
+            "type": "string",
+            "title": "Area"
+          },
+          "include_valid_links": {
+            "type": "boolean",
+            "title": "Include Valid Links",
+            "default": false
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 50
+          },
+          "summary": {
+            "$ref": "#/components/schemas/LinkReviewSummary"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/LinkReviewItem"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "valid_links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkReviewItem"
+            },
+            "type": "array",
+            "title": "Valid Links"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "recommendations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommendations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "area",
+          "summary"
+        ],
+        "title": "LinkReviewResponse"
+      },
+      "LinkReviewSummary": {
+        "properties": {
+          "projects_available": {
+            "type": "integer",
+            "title": "Projects Available",
+            "default": 0
+          },
+          "tasks": {
+            "$ref": "#/components/schemas/LinkReviewAreaSummary"
+          },
+          "memories": {
+            "$ref": "#/components/schemas/LinkReviewAreaSummary"
+          },
+          "decisions": {
+            "$ref": "#/components/schemas/LinkReviewAreaSummary"
+          }
+        },
+        "type": "object",
+        "title": "LinkReviewSummary"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       }
     }
   }
