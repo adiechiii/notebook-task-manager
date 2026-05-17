@@ -157,6 +157,25 @@
           }
         }
       }
+    },
+    "/system/suggested-fixes": {
+      "get": {
+        "operationId": "getSuggestedFixes",
+        "summary": "Get suggested Mind OS context fixes",
+        "description": "Read-only suggested fixes based on context health. Does not apply fixes or modify any data.",
+        "responses": {
+          "200": {
+            "description": "Suggested fixes result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestedFixesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -797,6 +816,75 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SheetHealth"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SuggestedFix": {
+        "type": "object",
+        "required": [
+          "fix_id",
+          "area",
+          "severity",
+          "issue",
+          "recommendation",
+          "safe_to_auto_fix"
+        ],
+        "properties": {
+          "fix_id": {
+            "type": "string"
+          },
+          "area": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "issue": {
+            "type": "string"
+          },
+          "recommendation": {
+            "type": "string"
+          },
+          "safe_to_auto_fix": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SuggestedFixesResponse": {
+        "type": "object",
+        "required": [
+          "ok",
+          "fix_count",
+          "fixes",
+          "warnings",
+          "recommendations"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "True when no suggested fixes were found."
+          },
+          "fix_count": {
+            "type": "integer",
+            "description": "Number of suggested fixes."
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuggestedFix"
             }
           },
           "warnings": {

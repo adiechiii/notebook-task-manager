@@ -133,3 +133,80 @@ def build_context_health():
         "warnings": warnings,
         "recommendations": recommendations,
     }
+
+
+def build_suggested_fixes():
+    health = build_context_health()
+    fixes = []
+    warnings = list(health.get("warnings", []))
+
+    for sheet in health.get("checked_sheets", []):
+        sheet_name = sheet.get("name", "Unknown")
+        fix_prefix = sheet_name.lower().replace(" ", "_")
+
+        if not sheet.get("exists"):
+            fixes.append({
+                "fix_id": f"{fix_prefix}_missing_sheet",
+                "area": sheet_name,
+                "severity": "High",
+                "issue": f"{sheet_name} sheet is missing.",
+                "recommendation": f"Create or restore the {sheet_name} sheet with the approved headers.",
+                "safe_to_auto_fix": False,
+            })
+            continue
+
+        if sheet.get("headers_match") is not True:
+            fixes.append({
+                "fix_id": f"{fix_prefix}_header_mismatch",
+                "area": sheet_name,
+                "severity": "High",
+                "issue": f"{sheet_name} headers do not match the approved schema.",
+                "recommendation": f"Review and correct the {sheet_name} headers before any write operations.",
+                "safe_to_auto_fix": False,
+            })
+
+        if sheet.get("missing_id_count", 0):
+            fixes.append({
+                "fix_id": f"{fix_prefix}_missing_ids",
+                "area": sheet_name,
+                "severity": "High",
+                "issue": f"{sheet_name} has {sheet.get('missing_id_count')} row(s) missing IDs.",
+                "recommendation": f"Fill or regenerate missing IDs in {sheet_name} before using admin update endpoints.",
+                "safe_to_auto_fix": False,
+            })
+
+        duplicate_ids = sheet.get("duplicate_ids", [])
+        if duplicate_ids:
+            fixes.append({
+                "fix_id": f"{fix_prefix}_duplicate_ids",
+                "area": sheet_name,
+                "severity": "High",
+                "issue": f"{sheet_name} has duplicate IDs.",
+                "recommendation": f"Resolve duplicate IDs in {sheet_name} before using bulk or exact-ID updates.",
+                "safe_to_auto_fix": False,
+            })
+
+        for field, missing_count in sheet.get("missing_required_fields", {}).items():
+            if missing_count:
+                fixes.append({
+                    "fix_id": f"{fix_prefix}_missing_{field.lower().replace(' ', '_')}",
+                    "area": sheet_name,
+                    "severity": "Medium",
+                    "issue": f"{sheet_name} has {missing_count} row(s) missing {field}.",
+                    "recommendation": f"Review {sheet_name} rows and fill missing {field} values.",
+                    "safe_to_auto_fix": False,
+                })
+
+    recommendations = []
+    if fixes:
+        recommendations.append("Review suggested fixes manually. No automatic fixes were applied.")
+    else:
+        recommendations.append("No suggested fixes found. Context health looks good.")
+
+    return {
+        "ok": len(fixes) == 0,
+        "fix_count": len(fixes),
+        "fixes": fixes,
+        "warnings": warnings,
+        "recommendations": recommendations,
+    }
