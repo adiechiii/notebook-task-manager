@@ -138,6 +138,25 @@
           }
         }
       }
+    },
+    "/system/context-health": {
+      "get": {
+        "operationId": "getContextHealth",
+        "summary": "Check Mind OS context health",
+        "description": "Read-only health check for Mind OS sheets and context integrity. Checks sheet existence, headers, row counts, missing IDs, duplicate IDs, missing required fields, warnings, and recommendations. Does not write or modify any data.",
+        "responses": {
+          "200": {
+            "description": "Context health result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -704,6 +723,93 @@
               "type": "string"
             },
             "description": "Warnings explaining skipped or blocked updates."
+          }
+        }
+      },
+      "SheetHealth": {
+        "type": "object",
+        "required": [
+          "name",
+          "exists",
+          "row_count",
+          "missing_id_count",
+          "duplicate_ids",
+          "missing_required_fields",
+          "warnings"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "exists": {
+            "type": "boolean"
+          },
+          "headers_match": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "row_count": {
+            "type": "integer"
+          },
+          "missing_id_count": {
+            "type": "integer"
+          },
+          "duplicate_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing_required_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ContextHealthResponse": {
+        "type": "object",
+        "required": [
+          "ok",
+          "checked_sheets",
+          "warnings",
+          "recommendations"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "True when no context health warnings were found."
+          },
+          "checked_sheets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SheetHealth"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }
