@@ -1,7 +1,11 @@
+import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+
+from zoneinfo import ZoneInfo
 
 from app.integrations.google_sheets_client import get_workbook
+from app.services.date_parser_service import normalize_task_title, parse_date_from_text
 
 
 TASK_BULK_FIELD_TO_COLUMN = {
@@ -11,6 +15,45 @@ TASK_BULK_FIELD_TO_COLUMN = {
     "project": "Project",
     "page_date": "Page Date",
 }
+
+def _clean(value):
+    return str(value or "").strip()
+
+
+def _created_date_from_created_at(value):
+    cleaned = _clean(value)
+    if not cleaned:
+        return ""
+
+    try:
+        parsed = datetime.fromisoformat(cleaned)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(ZoneInfo("Asia/Dubai")).date().isoformat()
+    except ValueError:
+        return cleaned[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", cleaned) else ""
+
+
+def _task_title_for_display(row):
+    raw_text = _clean(row.get("Raw Text"))
+    stored_title = _clean(row.get("Normalized Title"))
+
+    # Prefer the stored normalized title. If old rows still have date text inside,
+    # clean it at read time without modifying the sheet.
+    candidate = stored_title or raw_text
+    cleaned_title = normalize_task_title(candidate)
+    return cleaned_title or candidate
+
+
+def _due_date_for_display(row):
+    page_date = _clean(row.get("Page Date"))
+    if page_date:
+        return page_date
+
+    # Backward-compatible recovery for older rows saved before day-month parsing.
+    raw_text = _clean(row.get("Raw Text"))
+    stored_title = _clean(row.get("Normalized Title"))
+    return parse_date_from_text(raw_text) or parse_date_from_text(stored_title)
 
 
 class SheetsTaskRepository:
@@ -119,9 +162,21 @@ class SheetsTaskRepository:
             if status and row.get("Status") != status:
                 continue
 
+            due_date = _due_date_for_display(row)
+            created_at = row.get("Created At")
+
             tasks.append({
-                "text": row.get("Raw Text"),
+                "task_id": row.get("Task ID"),
+                "text": _task_title_for_display(row),
+                "title": _task_title_for_display(row),
+                "raw_text": row.get("Raw Text"),
                 "status": row.get("Status"),
+                "created_at": created_at,
+                "created_date": _created_date_from_created_at(created_at),
+                "due_date": due_date,
+                "page_date": due_date,
+                "category": row.get("Category"),
+                "priority": row.get("Priority"),
                 "project": row.get("Project"),
             })
 
