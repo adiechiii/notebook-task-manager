@@ -54,6 +54,10 @@ def _today():
     return datetime.now(ZoneInfo(timezone_name)).date()
 
 
+def today_iso():
+    return _today().isoformat()
+
+
 def _last_day_of_month(year, month):
     if month == 12:
         first_next_month = date(year + 1, 1, 1)

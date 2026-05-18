@@ -6,7 +6,7 @@ from app.services.context_linking_service import (
     resolve_suggested_project,
     suggest_project_link,
 )
-from app.services.date_parser_service import normalize_task_title, parse_date_from_text
+from app.services.date_parser_service import normalize_task_title, parse_date_from_text, today_iso
 from app.services.memory_classification_service import classify_memory
 from app.services.priority_scoring_service import score_priority
 from app.services.priority_service import parse_priority_from_text
@@ -288,6 +288,8 @@ def _task_preview(
     return {
         "raw_text": text,
         "normalized_title": normalize_task_title(text),
+        "created_date": today_iso(),
+        "due_date": page_date,
         "page_date": page_date,
         "category": classify_category(text),
         "priority": priority_scoring.get("priority") or parsed_priority,
