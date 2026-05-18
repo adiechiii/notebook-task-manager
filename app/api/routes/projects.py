@@ -5,12 +5,15 @@ from app.schemas.project_schema import ProjectCreateRequest, ProjectUpdateReques
 from app.services.project_dashboard_service import build_project_dashboard
 
 router = APIRouter()
-repo = SheetsProjectRepository()
+
+
+def _get_repo():
+    return SheetsProjectRepository()
 
 
 @router.post("/projects/create")
 def create_project(request: ProjectCreateRequest):
-    project_id = repo.create_project(
+    project_id = _get_repo().create_project(
         name=request.name,
         description=request.description,
     )
@@ -35,7 +38,7 @@ def update_project(request: ProjectUpdateRequest):
         if field != "name"
     }
 
-    updated, project, warnings = repo.update_project(
+    updated, project, warnings = _get_repo().update_project(
         name=request.name,
         fields=fields,
     )
@@ -51,7 +54,7 @@ def update_project(request: ProjectUpdateRequest):
 
 @router.get("/projects/stale", response_model=StaleProjectsResponse)
 def get_stale_projects(stale_after_days: int = Query(default=30)):
-    projects, warnings = repo.get_stale_projects(
+    projects, warnings = _get_repo().get_stale_projects(
         stale_after_days=stale_after_days,
         statuses={"active", "paused"},
     )
@@ -65,7 +68,7 @@ def get_stale_projects(stale_after_days: int = Query(default=30)):
 
 @router.get("/projects/search")
 def search_projects(query: str = Query(default="")):
-    projects = repo.search_projects(query)
+    projects = _get_repo().search_projects(query)
     return {"projects": projects}
 
 

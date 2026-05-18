@@ -6,7 +6,10 @@ from app.services.memory_classification_service import classify_memory
 from app.services.project_linking_service import resolve_project
 
 router = APIRouter()
-repo = SheetsMemoryRepository()
+
+
+def _get_repo():
+    return SheetsMemoryRepository()
 
 
 @router.post("/memory/create")
@@ -16,7 +19,7 @@ def create_memory(request: MemoryCreateRequest):
     if resolved_project:
         classification["project"] = resolved_project
 
-    memory_id = repo.create_memory(
+    memory_id = _get_repo().create_memory(
         request.text,
         memory_type=classification["type"],
         entity=classification["entity"],
@@ -45,7 +48,7 @@ def update_memory(request: MemoryUpdateRequest):
         if field != "memory_id"
     }
 
-    updated, memory, warnings = repo.update_memory(
+    updated, memory, warnings = _get_repo().update_memory(
         memory_id=request.memory_id,
         fields=fields,
     )
@@ -59,5 +62,5 @@ def update_memory(request: MemoryUpdateRequest):
 
 @router.get("/memory/search")
 def search_memories(query: str = Query(default="")):
-    memories = repo.search_memories(query)
+    memories = _get_repo().search_memories(query)
     return {"memories": memories}

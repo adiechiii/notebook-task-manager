@@ -6,8 +6,14 @@ from app.repositories.sheets_task_repository import SheetsTaskRepository
 from app.schemas.archive_schema import ArchiveRequest
 
 router = APIRouter()
-repo = SheetsTaskRepository()
-status_log_repo = SheetsStatusLogRepository()
+
+
+def _get_repo():
+    return SheetsTaskRepository()
+
+
+def _get_status_log_repo():
+    return SheetsStatusLogRepository()
 
 ARCHIVE_CONFIRMATION = "ARCHIVE COMPLETED TASKS"
 ARCHIVABLE_STATUSES = {"done", "completed"}
@@ -19,7 +25,7 @@ def get_archive_preview(
     older_than_days: int = Query(default=0, ge=0),
     include_done: bool = Query(default=True),
 ):
-    candidates = repo.get_archive_preview_candidates(
+    candidates = _get_repo().get_archive_preview_candidates(
         status=status,
         older_than_days=older_than_days,
         include_done=include_done,
@@ -87,7 +93,7 @@ def archive_tasks(request: ArchiveRequest):
             },
         )
 
-    archived, warnings = repo.archive_tasks(
+    archived, warnings = _get_repo().archive_tasks(
         status=request.status,
         older_than_days=request.older_than_days,
         include_done=request.include_done,
@@ -98,7 +104,7 @@ def archive_tasks(request: ArchiveRequest):
 
     logged_count = 0
     for task in archived:
-        status_log_repo.create_log(
+        _get_status_log_repo().create_log(
             task.get("task_id"),
             task.get("previous_status"),
             "Archived",

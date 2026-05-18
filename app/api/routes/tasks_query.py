@@ -3,7 +3,10 @@ from app.api.schemas.query_schema import QueryRequest
 from app.repositories.sheets_task_repository import SheetsTaskRepository
 
 router = APIRouter()
-repo = SheetsTaskRepository()
+
+
+def _get_repo():
+    return SheetsTaskRepository()
 
 
 @router.post("/query")
@@ -21,9 +24,9 @@ def query_tasks(request: QueryRequest):
         filters["Capture Date"] = request.date
 
     if not filters:
-        tasks = repo.get_all_tasks()
+        tasks = _get_repo().get_all_tasks()
     else:
-        tasks = repo.filter_tasks(filters)
+        tasks = _get_repo().filter_tasks(filters)
 
     return {
         "tasks": tasks,

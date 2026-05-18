@@ -9,11 +9,14 @@ from app.services.duplicate_detection_service import find_duplicate_task
 from app.services.project_linking_service import resolve_project
 
 router = APIRouter()
-repo = SheetsTaskRepository()
+
+
+def _get_repo():
+    return SheetsTaskRepository()
 
 
 def build_task_review(text: str, project: str = ""):
-    existing_tasks = repo.sheet.get_all_records()
+    existing_tasks = _get_repo().sheet.get_all_records()
     review = parse_tasks_from_text(text)
 
     for task in review:
@@ -64,13 +67,13 @@ def confirm_tasks(request: IngestRequest):
                 "raw_text": task,
                 "normalized_title": normalized_title,
             },
-            repo.sheet.get_all_records(),
+            _get_repo().sheet.get_all_records(),
         )
 
         duplicate_flag = "TRUE" if duplicate_result["duplicate"] else "FALSE"
         review_required = "TRUE" if duplicate_result["duplicate"] else "FALSE"
 
-        repo.create_task(
+        _get_repo().create_task(
             text=task,
             normalized_title=normalized_title,
             page_date=page_date,
