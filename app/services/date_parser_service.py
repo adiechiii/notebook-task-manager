@@ -72,14 +72,13 @@ def _next_month(year, month):
 
 def _weekday_date(today, weekday_idx, modifier=None):
     current_weekday = today.weekday()
-
-    if modifier == "next":
-        days_until = (weekday_idx - current_weekday) % 7
-        return today + timedelta(days=days_until + 7)
-
     delta = (weekday_idx - current_weekday) % 7
 
     if modifier == "this":
+        return today + timedelta(days=delta)
+
+    if modifier == "next":
+        delta = 7 if delta == 0 else delta
         return today + timedelta(days=delta)
 
     delta = 7 if delta == 0 else delta
