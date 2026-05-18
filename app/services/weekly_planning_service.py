@@ -30,6 +30,157 @@ def _safe_limit(value: int | None) -> int:
     return min(max(limit, 1), 50)
 
 
+def _task_from_raw_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "text": row.get("Raw Text"),
+        "title": row.get("Normalized Title"),
+        "status": row.get("Status"),
+        "page_date": str(row.get("Page Date", "")).strip(),
+        "category": row.get("Category"),
+        "priority": row.get("Priority"),
+        "project": row.get("Project"),
+    }
+
+
+def _active_task_from_raw_row(row: dict[str, Any]) -> dict[str, Any]:
+    task = _task_from_raw_row(row)
+    task["task_id"] = row.get("Task ID")
+    return task
+
+
+class _CachedTaskRepository:
+    def __init__(self, source):
+        self.source = source
+        self._rows = None
+        self._command_center_tasks = None
+        self._active_tasks = None
+
+    def _raw_rows(self):
+        if self._rows is None:
+            sheet = getattr(self.source, "sheet", None)
+            if sheet is None:
+                return None
+            self._rows = sheet.get_all_records()
+        return self._rows
+
+    def get_command_center_tasks(self):
+        if self._command_center_tasks is not None:
+            return list(self._command_center_tasks)
+
+        rows = self._raw_rows()
+        if rows is None:
+            self._command_center_tasks = list(self.source.get_command_center_tasks())
+            return list(self._command_center_tasks)
+
+        self._command_center_tasks = [
+            _task_from_raw_row(row)
+            for row in rows
+            if _key(row.get("Status")) != "archived"
+        ]
+        return list(self._command_center_tasks)
+
+    def get_active_tasks_for_duplicate_cleanup(self):
+        if self._active_tasks is not None:
+            return list(self._active_tasks)
+
+        rows = self._raw_rows()
+        if rows is None:
+            self._active_tasks = list(self.source.get_active_tasks_for_duplicate_cleanup())
+            return list(self._active_tasks)
+
+        self._active_tasks = [
+            _active_task_from_raw_row(row)
+            for row in rows
+            if _key(row.get("Status")) != "archived"
+        ]
+        return list(self._active_tasks)
+
+
+class _CachedMemoryRepository:
+    def __init__(self, memories: list[dict[str, Any]]):
+        self.memories = list(memories or [])
+
+    def search_memories(self, query: str):
+        q = _key(query)
+        if not q:
+            return list(self.memories)
+
+        return [
+            memory
+            for memory in self.memories
+            if q in _key(
+                " ".join(
+                    str(memory.get(field, ""))
+                    for field in ("text", "summary", "type", "entity", "project", "tags")
+                )
+            )
+        ]
+
+
+class _CachedProjectRepository:
+    def __init__(self, projects: list[dict[str, Any]]):
+        self.projects = list(projects or [])
+
+    def search_projects(self, query: str):
+        q = _key(query)
+        if not q:
+            return list(self.projects)
+
+        return [
+            project
+            for project in self.projects
+            if q in _key(
+                " ".join(
+                    str(project.get(field, ""))
+                    for field in ("name", "description", "goal", "status", "priority", "category", "tags")
+                )
+            )
+        ]
+
+
+class _CachedDecisionRepository:
+    def __init__(self, decisions: list[dict[str, Any]], warnings: list[str] | None = None):
+        self.decisions = list(decisions or [])
+        self.warnings = list(warnings or [])
+
+    def search_decisions(
+        self,
+        query: str = "",
+        status: str = "",
+        project: str = "",
+        importance: str = "",
+        limit: int = 50,
+    ):
+        q = _key(query)
+        status_key = _key(status)
+        project_key = _key(project)
+        importance_key = _key(importance)
+        safe_limit = _safe_limit(limit)
+
+        results = []
+        for decision in self.decisions:
+            if status_key and _key(decision.get("status")) != status_key:
+                continue
+            if project_key and _key(decision.get("project")) != project_key:
+                continue
+            if importance_key and _key(decision.get("importance")) != importance_key:
+                continue
+            if q and q not in _key(
+                " ".join(
+                    str(decision.get(field, ""))
+                    for field in ("decision", "project", "status", "importance", "rationale", "outcome")
+                )
+            ):
+                continue
+            results.append(decision)
+
+        return {
+            "schema_ok": True,
+            "decisions": results[:safe_limit],
+            "warnings": list(self.warnings),
+        }
+
+
 def _project_matches(value: Any, project: str) -> bool:
     wanted = _key(project)
     if not wanted:
@@ -473,9 +624,13 @@ def build_weekly_planning(
     project_repo = project_repo or SheetsProjectRepository()
     decision_repo = decision_repo or SheetsDecisionRepository()
 
-    all_tasks = task_repo.get_command_center_tasks()
+    cached_task_repo = _CachedTaskRepository(task_repo)
+    all_tasks = cached_task_repo.get_command_center_tasks()
     all_memories = memory_repo.search_memories("")
     all_projects = project_repo.search_projects("")
+
+    cached_memory_repo = _CachedMemoryRepository(all_memories)
+    cached_project_repo = _CachedProjectRepository(all_projects)
 
     scoped_tasks = _filter_tasks(all_tasks, requested_project)
     scoped_memories = _filter_memories(all_memories, requested_project)
@@ -492,36 +647,37 @@ def build_weekly_planning(
 
     decision_warnings: list[str] = []
     decisions = _decision_search(decision_repo, requested_project, decision_warnings)
+    cached_decision_repo = _CachedDecisionRepository(decisions, decision_warnings)
 
     smart_priorities = build_smart_priorities(
         project=requested_project,
         limit=safe_limit,
-        task_repo=task_repo,
-        memory_repo=memory_repo,
-        project_repo=project_repo,
-        decision_repo=decision_repo,
+        task_repo=cached_task_repo,
+        memory_repo=cached_memory_repo,
+        project_repo=cached_project_repo,
+        decision_repo=cached_decision_repo,
     )
     insights = build_insights(
         project=requested_project,
         limit=safe_limit,
-        task_repo=task_repo,
-        memory_repo=memory_repo,
-        project_repo=project_repo,
-        decision_repo=decision_repo,
+        task_repo=cached_task_repo,
+        memory_repo=cached_memory_repo,
+        project_repo=cached_project_repo,
+        decision_repo=cached_decision_repo,
     )
     unified_review = build_unified_review(
         period="weekly",
         project=requested_project,
         limit=safe_limit,
-        task_repo=task_repo,
-        memory_repo=memory_repo,
-        project_repo=project_repo,
-        decision_repo=decision_repo,
+        task_repo=cached_task_repo,
+        memory_repo=cached_memory_repo,
+        project_repo=cached_project_repo,
+        decision_repo=cached_decision_repo,
     )
     weekly_review = build_weekly_review(
-        task_repo=task_repo,
-        memory_repo=memory_repo,
-        project_repo=project_repo,
+        task_repo=cached_task_repo,
+        memory_repo=cached_memory_repo,
+        project_repo=cached_project_repo,
     )
 
     priority_tasks = _priority_tasks(smart_priorities, unified_review, safe_limit)
