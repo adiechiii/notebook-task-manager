@@ -1,6 +1,5 @@
 import json
 import os
-from functools import lru_cache
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -24,13 +23,11 @@ def load_google_credentials(scopes=SCOPES):
     return Credentials.from_service_account_file("credentials.json", scopes=scopes)
 
 
-@lru_cache(maxsize=1)
 def get_gspread_client():
     creds = load_google_credentials()
     return gspread.authorize(creds)
 
 
-@lru_cache(maxsize=8)
 def get_workbook(name="NotebookTasksDB"):
     return get_gspread_client().open(name)
 
