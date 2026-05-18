@@ -29,6 +29,14 @@ def get_gspread_client():
 
 
 def get_workbook(name="NotebookTasksDB"):
+    spreadsheet_id = (
+        os.getenv("GOOGLE_SPREADSHEET_ID")
+        or os.getenv("GOOGLE_SHEET_ID")
+        or os.getenv("NOTEBOOK_TASKS_DB_ID")
+    )
+    if spreadsheet_id:
+        return get_gspread_client().open_by_key(spreadsheet_id)
+
     return get_gspread_client().open(name)
 
 
