@@ -186,6 +186,20 @@ def _matched_date_phrase(text: str):
         )
         return _build_match(match, parsed_date)
 
+    match = _search(text, rf"\d{{1,2}}\s+(?:{MONTH_PATTERN})")
+    if match:
+        day_month_match = re.search(
+            rf"\b(\d{{1,2}})\s+({MONTH_PATTERN})\b",
+            match.group(0),
+            flags=re.IGNORECASE,
+        )
+        parsed_date = _month_day_date(
+            today,
+            day_month_match.group(2),
+            day_month_match.group(1),
+        )
+        return _build_match(match, parsed_date)
+
     match = _search(text, rf"(?:this|next)\s+(?:{WEEKDAY_PATTERN})")
     if match:
         weekday_match = re.search(
